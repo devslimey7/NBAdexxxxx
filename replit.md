@@ -3,15 +3,39 @@
 This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles (similar to countryballs but for NBA teams/players). The project is a fork/clone of BallsDex, adapted to use NBA collectibles instead of countryballs. It includes:
 
 - A Discord bot built with discord.py for spawning and managing collectibles
-- An admin panel built with Django for managing the bot's database and content
-- PostgreSQL database for persistent storage
+- An admin panel built with Django + Gunicorn (production server) for managing the bot's database and content
+- Neon PostgreSQL database for persistent storage
 - Support for trading, favoriting, and collecting NBA-themed cards
+- Drop command that allows users to spawn collectibles for others to catch
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
+
+# Recent Changes (Session: Nov 23, 2025)
+
+## New Features
+- **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
+  - Location: `ballsdex/packages/balls/cog.py` (lines 969-1045)
+  - Features: Tradeable check, favorite confirmation, locked item handling
+  - Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
+  - Automatically tracked as "obtained by trade" in `/nba info`
+
+## Production Deployment
+- Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
+- Collected 135 static files for production serving
+- Admin Panel: Listens on `0.0.0.0:5000`
+- Both workflows (Discord Bot + Admin Panel) running simultaneously
+
+## Configuration Fixes
+- Fixed CSRF issues for Replit iframe environment:
+  - Enabled session-based CSRF tokens (`CSRF_USE_SESSIONS = True`)
+  - Allowed iframe embedding (`X_FRAME_OPTIONS = 'ALLOWALL'`)
+  - Configured cookies with `SameSite='Lax'` for development environment
+- Fixed database URL SSL parameter from `sslmode` to `ssl` for asyncpg compatibility
 
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+Deployment: Production-grade server (Gunicorn), not development server.
 
 # System Architecture
 
