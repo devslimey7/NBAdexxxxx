@@ -1121,7 +1121,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
     @app_commands.checks.cooldown(1, 5)
     async def claim(self, interaction: discord.Interaction["BallsDexBot"]):
         """
-        Claim your daily NBA reward based on rarity and spawn rates.
+        Claim your daily NBA reward.
         """
         await interaction.response.defer(thinking=True)
 
@@ -1193,17 +1193,16 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             player.extra_data["last_claim_date"] = now.isoformat()
             await player.save()
             
-            # Send the card image with simple message (ephemeral/private)
-            embed = discord.Embed(
-                color=discord.Color.blurple(),
-            )
-            embed.set_image(url=selected_ball.wild_card)
+            # Generate and send the card image with simple message
+            content, file, view = await ball_instance.prepare_for_message(interaction)
             
             await interaction.followup.send(
                 content="Claim your daily NBA",
-                embed=embed,
+                file=file,
+                view=view,
                 ephemeral=True,
             )
+            file.close()
             
         except Exception as e:
             log.error(f"Error in claim command: {e}")
