@@ -1021,6 +1021,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 
         try:
             from ballsdex.packages.countryballs.countryball import BallSpawnView
+            from ballsdex.core.models import BallInstance
+            
+            # Refresh the BallInstance with prefetched Ball to avoid QuerySet issues
+            countryball = await BallInstance.get(id=countryball.id).prefetch_related('ball', 'player')
             
             # from_existing will lock the item itself
             spawn_view = await BallSpawnView.from_existing(self.bot, countryball)
