@@ -87,6 +87,7 @@ class Player(models.Model):
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
     extra_data = models.JSONField(blank=True, default=dict)
+    coins = models.BigIntegerField(default=0, help_text="Player's coin balance")
 
     def is_blacklisted(self) -> bool:
         blacklist = cast(
@@ -422,3 +423,32 @@ class Block(models.Model):
     class Meta:
         managed = True
         db_table = "block"
+
+
+class Pack(models.Model):
+    name = models.CharField(max_length=64, unique=True, help_text="Pack name (e.g., Common, Rare)")
+    cost = models.IntegerField(help_text="Coin cost to buy this pack")
+    description = models.TextField(help_text="Pack description for /packs info command")
+    enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.cost} coins)"
+
+    class Meta:
+        managed = True
+        db_table = "pack"
+
+
+class CoinTransaction(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="transactions")
+    amount = models.BigIntegerField(help_text="Coin amount (positive for gain, negative for loss)")
+    reason = models.CharField(max_length=128, help_text="Why coins were gained/lost (e.g., 'Pack Purchase')")
+    timestamp = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self) -> str:
+        return f"{self.player}: {self.amount:+d} coins ({self.reason})"
+
+    class Meta:
+        managed = True
+        db_table = "cointransaction"
+        indexes = [models.Index(fields=("player",))]
