@@ -126,7 +126,6 @@ class Economy(models.Model):
 
 class Regime(models.Model):
     name = models.CharField(max_length=64)
-    regime_type = models.SmallIntegerField(choices=((0, "Democracy"), (1, "Monarchy"), (2, "Dictatorship"), (3, "Communism")))
     icon = models.ImageField(max_length=200)
 
     def __str__(self) -> str:

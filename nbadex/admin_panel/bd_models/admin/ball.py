@@ -17,13 +17,13 @@ if TYPE_CHECKING:
 
 @admin.register(Regime)
 class RegimeAdmin(admin.ModelAdmin):
-    list_display = ("name", "background_image", "pk")
+    list_display = ("name", "regime_icon", "pk")
     search_fields = ("name",)
 
-    @admin.display()
-    def background_image(self, obj: Regime):
+    @admin.display(description="Icon")
+    def regime_icon(self, obj: Regime):
         return mark_safe(
-            f'<img src="/media/{transform_media(str(obj.background))}" height=60px />'
+            f'<img src="/media/{transform_media(str(obj.icon))}" height=60px />'
         )
 
     def get_deleted_objects(
