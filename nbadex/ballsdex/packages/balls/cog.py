@@ -1023,7 +1023,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 
         from ballsdex.packages.countryballs.countryball import BallSpawnView
         
-        spawn_view = BallSpawnView.from_existing(self.bot, countryball)
+        spawn_view = await BallSpawnView.from_existing(self.bot, countryball)
         
         channel = cast(discord.TextChannel, interaction.channel)
         success = await spawn_view.spawn(channel)

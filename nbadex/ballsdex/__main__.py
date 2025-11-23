@@ -241,6 +241,9 @@ class RemoveWSBehindMsg(logging.Filter):
 
 async def init_tortoise(db_url: str, *, skip_migrations: bool = False):
     log.debug(f"Database URL: {db_url}")
+    # Convert psycopg format (sslmode=require) to asyncpg format (ssl=true)
+    db_url_asyncpg = db_url.replace("?sslmode=require", "?ssl=true") if "?sslmode=require" in db_url else db_url
+    TORTOISE_ORM["connections"]["default"] = db_url_asyncpg
     TORTOISE_ORM["apps"]["models"]["models"].extend(settings.tortoise_models)
     await Tortoise.init(config=TORTOISE_ORM)
 

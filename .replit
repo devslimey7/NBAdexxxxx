@@ -9,7 +9,7 @@ packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp
 [userenv]
 
 [userenv.shared]
-BALLSDEXBOT_DB_URL = "postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?ssl=true"
+BALLSDEXBOT_DB_URL = "postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require"
 DJANGO_SETTINGS_MODULE = "admin_panel.settings.production"
 
 [workflows]
