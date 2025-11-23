@@ -86,6 +86,7 @@ class Player(models.Model):
     trade_cooldown_policy = models.SmallIntegerField(
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
+    coins = models.IntegerField(default=0, help_text="Player coin balance")
     extra_data = models.JSONField(blank=True, default=dict)
 
     def is_blacklisted(self) -> bool:
@@ -422,3 +423,50 @@ class Block(models.Model):
     class Meta:
         managed = True
         db_table = "block"
+
+
+class Pack(models.Model):
+    name = models.CharField(max_length=255, help_text="Pack name")
+    description = models.TextField(blank=True, help_text="Pack description")
+    cost = models.IntegerField(help_text="Cost in coins")
+    enabled = models.BooleanField(default=True, help_text="Whether pack is available for purchase")
+
+    def __str__(self) -> str:
+        return self.name
+
+    class Meta:
+        managed = True
+        db_table = "pack"
+
+
+class PackReward(models.Model):
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="rewards")
+    pack_id: int
+    ball = models.ForeignKey(Ball, on_delete=models.CASCADE)
+    ball_id: int
+    weight = models.IntegerField(default=1, help_text="Rarity weight (higher = more common)")
+
+    def __str__(self) -> str:
+        return f"{self.pack.name} → {self.ball.country}"
+
+    class Meta:
+        managed = True
+        db_table = "packreward"
+        unique_together = [["pack", "ball"]]
+
+
+class PlayerPack(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="packs")
+    player_id: int
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE)
+    pack_id: int
+    quantity = models.IntegerField(default=1, help_text="Number of packs owned")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.player} × {self.pack.name} ({self.quantity})"
+
+    class Meta:
+        managed = True
+        db_table = "playerpack"
+        unique_together = [["player", "pack"]]
