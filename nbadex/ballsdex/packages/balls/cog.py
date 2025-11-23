@@ -1191,25 +1191,16 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             player.extra_data["last_claim_date"] = now.isoformat()
             await player.save()
             
-            # Send success message
+            # Send the card image with simple message
             embed = discord.Embed(
-                title="🎁 Daily Reward Claimed!",
-                color=discord.Color.green(),
-                description=f"You received a **{selected_ball.country}**!",
+                color=discord.Color.blurple(),
             )
-            embed.add_field(
-                name="Stats",
-                value=f"Attack: {selected_ball.attack:+d}% ({attack_bonus:+d}%)\nHealth: {selected_ball.health:+d}% ({health_bonus:+d}%)",
-                inline=False,
-            )
-            embed.add_field(
-                name="ID",
-                value=f"`#{ball_instance.pk:0X}`",
-                inline=False,
-            )
-            embed.set_footer(text="Come back tomorrow for another reward!")
+            embed.set_image(url=selected_ball.wild_card)
             
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(
+                content="Claim your daily NBA",
+                embed=embed,
+            )
             
         except Exception as e:
             log.error(f"Error in claim command: {e}")
