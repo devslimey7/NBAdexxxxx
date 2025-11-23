@@ -11,6 +11,7 @@ from tortoise.expressions import RawSQL
 from tortoise.functions import Count
 
 from ballsdex.core.models import (
+    Ball,
     BallInstance,
     DonationPolicy,
     Player,
@@ -1113,5 +1114,106 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             log.error(f"Error in leaderboard command: {e}")
             await interaction.followup.send(
                 "An error occurred while fetching the leaderboard.",
+                ephemeral=True,
+            )
+
+    @app_commands.command()
+    @app_commands.checks.cooldown(1, 5)
+    async def claim(self, interaction: discord.Interaction["BallsDexBot"]):
+        """
+        Claim your daily NBA reward based on rarity and spawn rates.
+        """
+        await interaction.response.defer(thinking=True)
+
+        try:
+            from datetime import datetime, timedelta
+            import random
+            
+            # Get or create player
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            # Check if already claimed today
+            last_claim = player.extra_data.get("last_claim_date")
+            now = datetime.now()
+            
+            if last_claim:
+                last_claim_dt = datetime.fromisoformat(last_claim)
+                # Check if less than 24 hours have passed
+                if (now - last_claim_dt).total_seconds() < 86400:
+                    hours_left = 24 - ((now - last_claim_dt).total_seconds() / 3600)
+                    await interaction.followup.send(
+                        f"You've already claimed your daily reward! Come back in {hours_left:.1f} hours.",
+                        ephemeral=True,
+                    )
+                    return
+            
+            # Get all enabled balls with their rarities
+            all_balls = await Ball.all().filter(enabled=True)
+            
+            if not all_balls:
+                await interaction.followup.send(
+                    "No NBAs available to claim at the moment.",
+                    ephemeral=True,
+                )
+                return
+            
+            # Get balls with positive rarity for weighted selection
+            spawnable_balls = [b for b in all_balls if b.rarity > 0]
+            
+            if not spawnable_balls:
+                await interaction.followup.send(
+                    "No spawnable NBAs available to claim.",
+                    ephemeral=True,
+                )
+                return
+            
+            # Weighted random selection based on rarity
+            rarities = [b.rarity for b in spawnable_balls]
+            selected_ball = random.choices(spawnable_balls, weights=rarities, k=1)[0]
+            
+            # Generate random stats
+            attack_bonus = random.randint(
+                -settings.max_attack_bonus, settings.max_attack_bonus
+            )
+            health_bonus = random.randint(
+                -settings.max_health_bonus, settings.max_health_bonus
+            )
+            
+            # Create the ball instance
+            ball_instance = await BallInstance.create(
+                ball=selected_ball,
+                player=player,
+                attack_bonus=attack_bonus,
+                health_bonus=health_bonus,
+            )
+            
+            # Update last claim date
+            player.extra_data["last_claim_date"] = now.isoformat()
+            await player.save()
+            
+            # Send success message
+            embed = discord.Embed(
+                title="🎁 Daily Reward Claimed!",
+                color=discord.Color.green(),
+                description=f"You received a **{selected_ball.country}**!",
+            )
+            embed.add_field(
+                name="Stats",
+                value=f"Attack: {selected_ball.attack:+d}% ({attack_bonus:+d}%)\nHealth: {selected_ball.health:+d}% ({health_bonus:+d}%)",
+                inline=False,
+            )
+            embed.add_field(
+                name="ID",
+                value=f"`#{ball_instance.pk:0X}`",
+                inline=False,
+            )
+            embed.set_footer(text="Come back tomorrow for another reward!")
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            log.error(f"Error in claim command: {e}")
+            await interaction.followup.send(
+                "An error occurred while claiming your daily reward.",
                 ephemeral=True,
             )
