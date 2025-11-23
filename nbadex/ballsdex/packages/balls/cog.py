@@ -1134,7 +1134,32 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 ephemeral=True,
             )
 
-    @app_commands.command()
+    player = app_commands.Group(name="player", description="Player account management")
+
+    @player.command(name="coins")
+    async def player_coins(self, interaction: discord.Interaction["BallsDexBot"]):
+        """Check your coin balance."""
+        await interaction.response.defer(thinking=True, ephemeral=True)
+
+        try:
+            player_obj, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            embed = discord.Embed(
+                title="💰 Your Coins",
+                description=f"Balance: **{player_obj.coins}** coins",
+                color=discord.Color.gold(),
+            )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            log.error(f"Error in player coins command: {e}")
+            await interaction.followup.send(
+                "An error occurred.",
+                ephemeral=True,
+            )
+
+    @player.command(name="coins-give")
     @app_commands.describe(user="User to give coins to", amount="Amount of coins")
     async def player_coins_give(self, interaction: discord.Interaction["BallsDexBot"], user: discord.User, amount: int):
         """Give coins to another player."""
@@ -1169,32 +1194,9 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             )
 
         except Exception as e:
-            log.error(f"Error in player_coins_give command: {e}")
+            log.error(f"Error in player coins-give command: {e}")
             await interaction.followup.send(
                 "An error occurred while giving coins.",
-                ephemeral=True,
-            )
-
-    @app_commands.command()
-    async def player_coins(self, interaction: discord.Interaction["BallsDexBot"]):
-        """Check your coin balance."""
-        await interaction.response.defer(thinking=True, ephemeral=True)
-
-        try:
-            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
-            
-            embed = discord.Embed(
-                title="💰 Your Coins",
-                description=f"Balance: **{player.coins}** coins",
-                color=discord.Color.gold(),
-            )
-            
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        except Exception as e:
-            log.error(f"Error in player_coins command: {e}")
-            await interaction.followup.send(
-                "An error occurred.",
                 ephemeral=True,
             )
 

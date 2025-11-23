@@ -17,10 +17,10 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 ### Coins System
 - **Player Coins Management**: Each player has a coin balance (stored in `Player.coins`)
 - **Coin Commands**:
-  - `/player coins`: Check your current coin balance
-  - `/player coins give <user> <amount>`: Transfer coins to another player
+  - `/nba player coins`: Check your current coin balance
+  - `/nba player coins-give <user> <amount>`: Transfer coins to another player
 - **All commands are admin-customizable** via Django admin panel
-- Location: `ballsdex/packages/balls/cog.py` (lines 1140-1202)
+- Location: `ballsdex/packages/balls/cog.py` (lines 1137-1204)
 
 ### Packs System
 - **Complete pack system** for purchasing and opening collectible packs
