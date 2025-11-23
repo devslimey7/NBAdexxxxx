@@ -148,30 +148,33 @@ class Special(models.Model):
 
 
 class Ball(models.Model):
-    name = models.CharField(max_length=64, help_text="NBA collectible name (e.g., LeBron James)")
+    country = models.CharField(max_length=64, help_text="NBA collectible name (e.g., LeBron James)")
     economy = models.ForeignKey(Economy, on_delete=models.PROTECT)
     regime = models.ForeignKey(Regime, on_delete=models.PROTECT)
     rarity = models.FloatField(help_text="How rare is this NBA (0-1, where 1 is most common)")
-    emoji = models.CharField(max_length=2)
+    emoji_id = models.BigIntegerField()
     catch_names = models.CharField(
         max_length=200,
         blank=True,
         help_text="Catch names separated by semicolons (e.g., 'lebron; bron; king james')",
     )
-    description = models.TextField(blank=True, help_text="NBA description")
-    image_url = models.CharField(
-        max_length=300,
-        blank=True,
-        help_text="URL to the NBA's image",
-    )
-    atk = models.IntegerField(default=0)
-    hp = models.IntegerField(default=0)
-    catch_phrase = models.CharField(max_length=100, blank=True)
+    short_name = models.CharField(max_length=64, blank=True, null=True)
+    translations = models.TextField(blank=True, null=True)
+    wild_card = models.CharField(max_length=200, blank=True)
+    collection_card = models.CharField(max_length=200, blank=True)
+    credits = models.CharField(max_length=64, blank=True)
+    capacity_name = models.CharField(max_length=64, blank=True)
+    capacity_description = models.CharField(max_length=256, blank=True)
+    capacity_logic = models.JSONField(default=dict, blank=True)
+    attack = models.IntegerField(default=0)
+    health = models.IntegerField(default=0)
     enabled = models.BooleanField(default=True)
+    tradeable = models.BooleanField(default=True)
     catch_value = models.IntegerField(default=10, help_text="Coins awarded when this NBA is caught")
+    created_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.emoji})"
+        return f"{self.country}"
 
     class Meta:
         managed = True
@@ -313,22 +316,23 @@ class Pack(models.Model):
 
 
 class PackReward(models.Model):
-    pack = models.OneToOneField(Pack, on_delete=models.CASCADE, related_name="reward")
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE)
     coins = models.IntegerField(default=0, help_text="Coins given when pack is opened")
-    description = models.TextField(help_text="What this pack gives (for reference)")
+    description = models.TextField(blank=True, null=True, help_text="What this pack gives (for reference)")
 
     def __str__(self) -> str:
-        return f"{self.pack.name} Reward: {self.coins} coins"
+        return f"{self.pack.name}: {self.coins} coins"
 
     class Meta:
         managed = True
         db_table = "packreward"
+        verbose_name_plural = "Pack Rewards"
 
 
 class CoinReward(models.Model):
-    name = models.CharField(max_length=64, unique=True, help_text="Config name (e.g., 'catch_reward')")
+    name = models.CharField(max_length=64, help_text="Config name (e.g., 'catch_reward')")
     base_coins = models.IntegerField(default=10, help_text="Base coins awarded for catching an NBA")
-    description = models.TextField(help_text="Description of this coin reward configuration")
+    description = models.TextField(blank=True, null=True, help_text="Description of this coin reward configuration")
 
     def __str__(self) -> str:
         return f"{self.name}: {self.base_coins} coins"

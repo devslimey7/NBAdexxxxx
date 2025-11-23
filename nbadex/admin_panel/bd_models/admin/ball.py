@@ -84,11 +84,11 @@ class BallAdmin(admin.ModelAdmin):
             None,
             {
                 "fields": [
-                    "name",
-                    "hp",
-                    "atk",
+                    "country",
+                    "health",
+                    "attack",
                     "rarity",
-                    "emoji",
+                    "emoji_id",
                     "economy",
                     "regime",
                 ],
@@ -98,10 +98,10 @@ class BallAdmin(admin.ModelAdmin):
             "Details",
             {
                 "fields": [
-                    "catch_phrase",
+                    "capacity_name",
+                    "capacity_description",
                     "catch_names",
-                    "description",
-                    "image_url",
+                    "short_name",
                 ],
             },
         ),
@@ -119,31 +119,35 @@ class BallAdmin(admin.ModelAdmin):
                 "classes": ["collapse"],
                 "fields": [
                     "enabled",
+                    "tradeable",
+                    "wild_card",
+                    "collection_card",
+                    "credits",
+                    "capacity_logic",
+                    "translations",
                 ],
             },
         ),
     ]
 
     list_display = [
-        "name",
+        "country",
         "pk",
-        "emoji",
         "rarity",
-        "hp",
-        "atk",
+        "health",
+        "attack",
         "enabled",
     ]
     list_editable = ["enabled", "rarity"]
-    list_filter = ["enabled", "regime", "economy"]
+    list_filter = ["enabled", "tradeable", "regime", "economy"]
 
     search_fields = [
-        "name",
+        "country",
         "catch_names",
-        "description",
         "pk",
     ]
     search_help_text = (
-        "Search for NBA name, ID, catch names or description"
+        "Search for NBA name, ID or catch names"
     )
 
     @admin.display(description="Emoji")
