@@ -5,3 +5,9 @@ expertMode = true
 [nix]
 channel = "stable-25_05"
 packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "libyaml", "openjpeg", "postgresql", "tcl", "tk", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+BALLSDEXBOT_DB_URL = "postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+DJANGO_SETTINGS_MODULE = "admin_panel.settings.production"

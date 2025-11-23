@@ -962,3 +962,81 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             if emoji:
                 embed.set_thumbnail(url=emoji.url)
         await interaction.followup.send(embed=embed)
+
+    @app_commands.command()
+    @app_commands.checks.cooldown(1, 60, key=lambda i: i.user.id)
+    async def drop(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        countryball: BallInstanceTransform,
+        special: SpecialEnabledTransform | None = None,
+    ):
+        """
+        Drop a countryball from your inventory for others to catch.
+
+        Parameters
+        ----------
+        countryball: BallInstance
+            The countryball you want to drop
+        special: Special
+            Filter the results of autocompletion to a special event. Ignored afterwards.
+        """
+        if not countryball:
+            await interaction.response.send_message(
+                f"You don't have this {settings.collectible_name}.", ephemeral=True
+            )
+            return
+        
+        if not countryball.is_tradeable:
+            await interaction.response.send_message(
+                f"You cannot drop this {settings.collectible_name}.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(thinking=True)
+
+        if countryball.favorite:
+            view = ConfirmChoiceView(
+                interaction,
+                accept_message=f"{settings.collectible_name.title()} dropped successfully.",
+                cancel_message="Drop cancelled.",
+            )
+            await interaction.followup.send(
+                f"This {settings.collectible_name} is a favorite, "
+                "are you sure you want to drop it?",
+                view=view,
+                ephemeral=True,
+            )
+            await view.wait()
+            if not view.value:
+                return
+
+        if await countryball.is_locked():
+            await interaction.followup.send(
+                f"This {settings.collectible_name} is currently in an active trade or donation, "
+                "please try again later.",
+                ephemeral=True,
+            )
+            return
+
+        await countryball.lock_for_trade()
+
+        from ballsdex.packages.countryballs.countryball import BallSpawnView
+        
+        spawn_view = BallSpawnView.from_existing(self.bot, countryball)
+        
+        channel = cast(discord.TextChannel, interaction.channel)
+        success = await spawn_view.spawn(channel)
+        
+        if success:
+            await interaction.followup.send(
+                f"You dropped **{countryball.countryball.country}**! "
+                f"Anyone can now catch it, including you (but that would be cheap!).",
+                ephemeral=True,
+            )
+        else:
+            await countryball.unlock()
+            await interaction.followup.send(
+                f"Failed to drop the {settings.collectible_name}. Please try again.",
+                ephemeral=True,
+            )

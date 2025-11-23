@@ -430,7 +430,10 @@ class BallSpawnView(View):
                 "that has been added to your completion!"
             )
         if self.ballinstance:
-            text += f"This {settings.collectible_name} was dropped by <@{self.og_id}>\n"
+            if ball.player.discord_id == self.og_id:
+                text += "You caught your own drop? What a cheap thing to do.\n"
+            else:
+                text += f"This {settings.collectible_name} was dropped by <@{self.og_id}>\n"
 
         caught_message = (
             random.choice(settings.caught_messages).format(
