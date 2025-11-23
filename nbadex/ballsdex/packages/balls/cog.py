@@ -1145,6 +1145,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 time_since_claim = (now - last_claim_dt).total_seconds()
                 if time_since_claim < 86400:  # 24 hours = 86400 seconds
                     log.info(f"Player {interaction.user.id} tried to claim within cooldown")
+                    await interaction.followup.send(content="", ephemeral=True)
                     return
             
             log.info("Getting all balls")
