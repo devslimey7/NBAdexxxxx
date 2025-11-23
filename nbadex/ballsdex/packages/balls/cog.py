@@ -1100,27 +1100,21 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 inline=False
             )
 
-            # Build professional leaderboard
+            # Build leaderboard
             leaderboard_text = ""
             medals = ["🥇", "🥈", "🥉"]
-            rank_icons = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
             
             for idx, (player, count) in enumerate(top_10, 1):
                 try:
                     user = await self.bot.fetch_user(player.discord_id)
-                    name = f"**{user.name}**"
+                    name = user.name
                 except discord.NotFound:
-                    name = f"**Unknown User**"
+                    name = "Unknown User"
                 
-                # Determine medal/rank icon
-                medal = medals[idx - 1] if idx <= 3 else rank_icons[idx - 1]
+                # Determine medal for top 3
+                medal = medals[idx - 1] if idx <= 3 else f"#{idx}"
                 
-                # Calculate progress bar (relative to max)
-                bar_length = 15
-                filled = int((count / max_count) * bar_length) if max_count > 0 else 0
-                bar = "▰" * filled + "▱" * (bar_length - filled)
-                
-                leaderboard_text += f"{medal} {name}\n{bar} **{count}**\n\n"
+                leaderboard_text += f"{medal} {name} · **{count}**\n"
             
             embed.add_field(
                 name="🏅 RANKINGS",
