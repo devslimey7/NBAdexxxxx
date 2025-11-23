@@ -11,41 +11,11 @@ from ballsdex.settings import settings
 log = logging.getLogger("ballsdex.packages.economy")
 
 
-class Economy(commands.Cog):
-    """Economy system for collecting coins and buying packs"""
-
-    def __init__(self, bot: BallsDexBot):
-        self.bot = bot
-        
-        # Create command groups
-        self.coins = app_commands.Group(
-            name="coins", 
-            description="Coin commands"
-        )
-        self.packs = app_commands.Group(
-            name="packs",
-            description="Pack commands"
-        )
-        self.pack = app_commands.Group(
-            name="pack",
-            description="Single pack commands"
-        )
-        
-        # Add commands to groups
-        self.coins.add_command(self.balance_cmd)
-        self.coins.add_command(self.leaderboard_cmd)
-        self.packs.add_command(self.info_cmd)
-        self.packs.add_command(self.buy_cmd)
-        self.packs.add_command(self.open_cmd)
-        self.pack.add_command(self.give_cmd)
-        
-        # Add groups to bot tree
-        self.bot.tree.add_command(self.coins)
-        self.bot.tree.add_command(self.packs)
-        self.bot.tree.add_command(self.pack)
+class CoinsGroup(app_commands.Group):
+    """Coin commands"""
 
     @app_commands.command(name="balance", description="Check your coin balance")
-    async def balance_cmd(self, interaction: discord.Interaction):
+    async def balance(self, interaction: discord.Interaction):
         """Check your coin balance"""
         player, _ = await Player.get_or_create(discord_id=interaction.user.id)
         await interaction.response.send_message(
@@ -54,7 +24,7 @@ class Economy(commands.Cog):
         )
 
     @app_commands.command(name="leaderboard", description="Show top 10 players by coins")
-    async def leaderboard_cmd(self, interaction: discord.Interaction):
+    async def leaderboard(self, interaction: discord.Interaction):
         """Show top 10 players by coins"""
         await interaction.response.defer()
 
@@ -79,8 +49,12 @@ class Economy(commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
+
+class PacksGroup(app_commands.Group):
+    """Pack commands"""
+
     @app_commands.command(name="info", description="See available packs and their contents")
-    async def info_cmd(self, interaction: discord.Interaction):
+    async def info(self, interaction: discord.Interaction):
         """See available packs and their contents"""
         await interaction.response.defer()
 
@@ -108,7 +82,7 @@ class Economy(commands.Cog):
 
     @app_commands.command(name="buy", description="Buy a pack")
     @app_commands.describe(pack_name="Name of the pack to buy")
-    async def buy_cmd(self, interaction: discord.Interaction, pack_name: str):
+    async def buy(self, interaction: discord.Interaction, pack_name: str):
         """Buy a pack"""
         player, _ = await Player.get_or_create(discord_id=interaction.user.id)
 
@@ -141,18 +115,22 @@ class Economy(commands.Cog):
 
     @app_commands.command(name="open", description="Open a pack")
     @app_commands.describe(pack_name="Name of the pack to open")
-    async def open_cmd(self, interaction: discord.Interaction, pack_name: str):
+    async def open(self, interaction: discord.Interaction, pack_name: str):
         """Open a pack (admin configured via admin panel)"""
         await interaction.response.send_message(
             f"📦 Opening {pack_name}... (Contents configured in admin panel)",
             ephemeral=True,
         )
 
+
+class PackGroup(app_commands.Group):
+    """Single pack commands"""
+
     @app_commands.command(name="give", description="Give coins to another player")
     @app_commands.describe(
         user="User to give coins to", amount="Number of coins to give"
     )
-    async def give_cmd(
+    async def give(
         self, interaction: discord.Interaction, user: discord.User, amount: int
     ):
         """Give coins to another player"""
@@ -189,6 +167,17 @@ class Economy(commands.Cog):
             f"✅ Sent **{amount}** coins to {user.mention}!",
             ephemeral=True,
         )
+
+
+class Economy(commands.Cog):
+    """Economy system for collecting coins and buying packs"""
+
+    coins = CoinsGroup(name="coins", description="Coin commands")
+    packs = PacksGroup(name="packs", description="Pack commands")
+    pack = PackGroup(name="pack", description="Single pack commands")
+
+    def __init__(self, bot: BallsDexBot):
+        self.bot = bot
 
 
 async def setup(bot: BallsDexBot):
