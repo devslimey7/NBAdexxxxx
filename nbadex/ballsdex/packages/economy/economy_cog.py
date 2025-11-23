@@ -10,6 +10,22 @@ from ballsdex.core.models import Pack, Player, CoinTransaction
 log = logging.getLogger("ballsdex.packages.economy")
 
 
+async def pack_autocomplete(
+    interaction: discord.Interaction, current: str
+) -> list[app_commands.Choice[str]]:
+    """Autocomplete for pack names"""
+    try:
+        packs = await Pack.filter(enabled=True).all()
+        matches = [p for p in packs if current.lower() in p.name.lower()]
+        return [
+            app_commands.Choice(name=f"{pack.name} ({pack.cost} coins)", value=pack.name)
+            for pack in matches[:25]
+        ]
+    except Exception:
+        # Return empty list if tables don't exist yet
+        return []
+
+
 class Economy(commands.Cog):
     """Economy system for collecting coins and buying packs"""
 
@@ -125,7 +141,7 @@ class Economy(commands.Cog):
 
             if not packs:
                 await interaction.followup.send(
-                    "No packs available at the moment.", ephemeral=True
+                    "No packs available at the moment. Admin needs to create them!", ephemeral=True
                 )
                 return
 
@@ -149,35 +165,36 @@ class Economy(commands.Cog):
             )
 
     @packs.command(name="buy", description="Buy a pack")
-    @app_commands.describe(pack_name="Name of the pack to buy")
-    async def pack_buy(self, interaction: discord.Interaction, pack_name: str):
+    @app_commands.describe(pack="Select a pack to purchase")
+    @app_commands.autocomplete(pack=pack_autocomplete)
+    async def pack_buy(self, interaction: discord.Interaction, pack: str):
         """Buy a pack"""
         try:
             player, _ = await Player.get_or_create(discord_id=interaction.user.id)
 
-            pack = await Pack.filter(name=pack_name, enabled=True).first()
-            if not pack:
+            pack_obj = await Pack.filter(name=pack, enabled=True).first()
+            if not pack_obj:
                 await interaction.response.send_message(
-                    f"Pack '{pack_name}' not found or is disabled.", ephemeral=True
+                    f"Pack '{pack}' not found or is disabled.", ephemeral=True
                 )
                 return
 
-            if player.coins < pack.cost:
+            if player.coins < pack_obj.cost:
                 await interaction.response.send_message(
-                    f"❌ Insufficient coins! You need {pack.cost} coins but only have {player.coins}.",
+                    f"❌ Insufficient coins! You need {pack_obj.cost} coins but only have {player.coins}.",
                     ephemeral=True,
                 )
                 return
 
-            player.coins -= pack.cost
+            player.coins -= pack_obj.cost
             await player.save(update_fields=("coins",))
 
             await CoinTransaction.create(
-                player=player, amount=-pack.cost, reason=f"Pack Purchase: {pack.name}"
+                player=player, amount=-pack_obj.cost, reason=f"Pack Purchase: {pack_obj.name}"
             )
 
             await interaction.response.send_message(
-                f"✅ Purchased **{pack.name}** for {pack.cost} coins!\n"
+                f"✅ Purchased **{pack_obj.name}** for {pack_obj.cost} coins!\n"
                 f"Remaining balance: **{player.coins:,}** coins",
                 ephemeral=True,
             )
@@ -188,12 +205,13 @@ class Economy(commands.Cog):
             )
 
     @packs.command(name="open", description="Open a pack")
-    @app_commands.describe(pack_name="Name of the pack to open")
-    async def pack_open(self, interaction: discord.Interaction, pack_name: str):
+    @app_commands.describe(pack="Select a pack to open")
+    @app_commands.autocomplete(pack=pack_autocomplete)
+    async def pack_open(self, interaction: discord.Interaction, pack: str):
         """Open a pack (admin configured via admin panel)"""
         try:
             await interaction.response.send_message(
-                f"📦 Opening {pack_name}... (Contents configured in admin panel)",
+                f"📦 Opening **{pack}**... (Contents configured in admin panel)",
                 ephemeral=True,
             )
         except Exception as e:
