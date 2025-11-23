@@ -123,6 +123,13 @@ class BallAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Economy",
+            {
+                "description": "Coin rewards for catching this NBA",
+                "fields": ["catch_value"],
+            },
+        ),
+        (
             "Advanced",
             {
                 "description": "Advanced settings",

@@ -33,11 +33,24 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Transaction tracking for all coin movements
   - Configuration: All coin rewards and pack contents managed entirely through admin panel
 
+- **Individual NBA Catch Values** - Each NBA has configurable coin rewards
+  - Location: Database column `ball.catch_value` (INTEGER DEFAULT 10)
+  - Admin panel field: Ball model fieldset "Economy" > "catch_value"
+  - Implementation: Raw SQL query in `countryball.py` catch_ball method fetches catch_value per NBA
+  - Coin award logic: When player catches NBA, coins are awarded based on ball.catch_value
+  - Transaction logging: Creates CoinTransaction record with reason "Caught {NBA_name}"
+  - Location of implementation: `ballsdex/packages/countryballs/countryball.py` (lines 399-416)
+
 ## Production Deployment
 - Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
 - Collected 135 static files for production serving
 - Admin Panel: Listens on `0.0.0.0:5000`
 - Both workflows (Discord Bot + Admin Panel) running simultaneously
+
+## Database Schema Updates
+- Added `catch_value` column to `ball` table: INTEGER DEFAULT 10
+- Added `catch_value` field to Django Ball model for admin panel configuration
+- Field accessible in admin panel under Ball > Economy fieldset
 
 ## Configuration Fixes
 - Fixed CSRF issues for Replit iframe environment:
@@ -45,6 +58,12 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Allowed iframe embedding (`X_FRAME_OPTIONS = 'ALLOWALL'`)
   - Configured cookies with `SameSite='Lax'` for development environment
 - Fixed database URL SSL parameter from `sslmode` to `ssl` for asyncpg compatibility
+
+## Technical Implementation Notes
+- **Tortoise ORM Schema Handling**: catch_value column is NOT in Tortoise Ball model definition (avoided schema caching issues with asyncpg)
+- **Access Pattern**: Raw SQL queries fetch catch_value when needed in catch_ball method
+- **Admin Panel**: Django ORM model includes catch_value field for easy configuration via admin interface
+- **Separation of Concerns**: Bot uses raw SQL, admin panel uses Django ORM for the same column
 
 # User Preferences
 

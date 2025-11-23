@@ -170,6 +170,7 @@ class Ball(models.Model):
     hp = models.IntegerField(default=0)
     catch_phrase = models.CharField(max_length=100, blank=True)
     enabled = models.BooleanField(default=True)
+    catch_value = models.IntegerField(default=10, help_text="Coins awarded when this NBA is caught")
 
     def __str__(self) -> str:
         return f"{self.name} ({self.emoji})"
