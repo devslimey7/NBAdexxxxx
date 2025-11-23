@@ -13,11 +13,50 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 # Recent Changes (Session: Nov 23, 2025)
 
 ## New Features
-- **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
-  - Location: `ballsdex/packages/balls/cog.py` (lines 969-1045)
-  - Features: Tradeable check, favorite confirmation, locked item handling
-  - Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
-  - Automatically tracked as "obtained by trade" in `/nba info`
+
+### Coins System
+- **Player Coins Management**: Each player has a coin balance (stored in `Player.coins`)
+- **Coin Commands**:
+  - `/player coins`: Check your current coin balance
+  - `/player coins give <user> <amount>`: Transfer coins to another player
+- **All commands are admin-customizable** via Django admin panel
+- Location: `ballsdex/packages/balls/cog.py` (lines 1140-1202)
+
+### Packs System
+- **Complete pack system** for purchasing and opening collectible packs
+- **Pack Models**:
+  - `Pack`: Defines pack name, description, cost, and availability
+  - `PackReward`: Links packs to balls with weighted drop rates
+  - `PlayerPack`: Tracks pack ownership and inventory per player
+- **Pack Commands**:
+  - `/packs list`: List all available packs with costs
+  - `/packs buy <pack_name>`: Purchase a pack using coins
+  - `/packs inventory`: View your owned packs
+  - `/packs open <pack_name>`: Open a pack and get a random ball
+  - `/packs give <user> <pack_name> [quantity]`: Gift packs to other players
+- **Location**: `ballsdex/packages/packs/cog.py` (complete module)
+- **Admin Customization**: Fully customizable in Django admin panel
+  - Create/manage packs (name, description, cost, enabled status)
+  - Assign balls to packs with drop rate weights
+  - View player pack inventory
+
+### Leaderboard Redesign
+- Professional green color scheme (0x1f8b4c)
+- Global stats display (top players count, total collected, highest count)
+- Clean format: `🥇 Player Name · **Count**`
+- Medals for top 3, numbers for ranks 4-10
+
+### 24-Hour Daily Claim System
+- `/nba claim`: Claim daily NBA card with 24-hour cooldown per player
+- **Silent cooldown**: No message shown when on cooldown
+- Shows congratulations message with card details on successful claim
+- Tracks claim time in `Player.extra_data['last_claim_date']`
+
+### Drop Command Enhancements
+- **Location**: `ballsdex/packages/balls/cog.py` (lines 969-1045)
+- Features: Tradeable check, favorite confirmation, locked item handling
+- Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
+- Automatically tracked as "obtained by trade"
 
 ## Production Deployment
 - Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
@@ -58,9 +97,12 @@ Deployment: Production-grade server (Gunicorn), not development server.
 **Key models**:
 - `Ball`: Represents NBA collectibles (teams, players)
 - `BallInstance`: Individual cards owned by players
-- `Player`: Discord users who collect cards
+- `Player`: Discord users who collect cards (includes coins and extra_data for cooldowns)
 - `Trade`: Trading system between players
 - `Special`: Special event cards (e.g., shiny variants)
+- `Pack`: Purchasable packs containing random balls
+- `PackReward`: Weighted ball rewards in packs
+- `PlayerPack`: Player pack ownership and inventory
 - `GuildConfig`: Server-specific settings
 - `BlacklistedID/BlacklistedGuild`: Moderation system
 
@@ -72,7 +114,8 @@ Deployment: Production-grade server (Gunicorn), not development server.
 
 **Key cogs**:
 - `CountryBallsSpawner`: Handles spawning collectibles in channels based on message activity
-- `Balls`: Player inventory management, info commands, donations
+- `Balls`: Player inventory management, info commands, donations, coins, daily claims, leaderboard
+- `Packs`: Pack purchasing, opening, inventory, and gifting system
 - `Admin`: Administrative commands for bot owners/staff
 - `Config`: Server configuration and setup
 - `Trade`: Trading system between players
