@@ -1188,20 +1188,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             # Generate and send the card image with congratulations
             content, file, view = await ball_instance.prepare_for_message(interaction)
             
-            # Create embed with card details
-            embed = discord.Embed(
-                title=f"🎉 Congratulations! You claimed **{selected_ball.name}**!",
-                description=f"*{selected_ball.description}*",
-                color=discord.Color.gold()
-            )
-            embed.add_field(
-                name="📊 Stats",
-                value=f"❤️ **Health**: {selected_ball.health + ball_instance.health_bonus}\n⚔️ **Attack**: {selected_ball.attack + ball_instance.attack_bonus}",
-                inline=False
-            )
+            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*"
             
             await interaction.followup.send(
-                embed=embed,
+                content=congrats_msg,
                 file=file,
                 view=view,
                 ephemeral=True,
