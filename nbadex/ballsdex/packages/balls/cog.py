@@ -1053,3 +1053,122 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 f"It has been returned to your inventory.",
                 ephemeral=True,
             )
+
+    @app_commands.command()
+    @app_commands.checks.cooldown(1, 5)
+    async def give(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        countryball: BallInstanceTransform,
+        user: discord.User,
+        special: SpecialEnabledTransform | None = None,
+    ):
+        """
+        Give a countryball to another player instantly.
+
+        Parameters
+        ----------
+        countryball: BallInstance
+            The countryball you want to give
+        user: discord.User
+            The player to give the countryball to
+        special: Special
+            Filter the results of autocompletion to a special event. Ignored afterwards.
+        """
+        if not countryball:
+            await interaction.response.send_message(
+                f"You don't have this {settings.collectible_name}.", ephemeral=True
+            )
+            return
+
+        if user.id == interaction.user.id:
+            await interaction.response.send_message(
+                f"You can't give a {settings.collectible_name} to yourself!", ephemeral=True
+            )
+            return
+
+        if not countryball.is_tradeable:
+            await interaction.response.send_message(
+                f"You cannot give this {settings.collectible_name}.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(thinking=True)
+
+        if countryball.favorite:
+            view = ConfirmChoiceView(
+                interaction,
+                accept_message=f"{settings.collectible_name.title()} given successfully.",
+                cancel_message="Give cancelled.",
+            )
+            await interaction.followup.send(
+                f"This {settings.collectible_name} is a favorite, "
+                "are you sure you want to give it away?",
+                view=view,
+                ephemeral=True,
+            )
+            await view.wait()
+            if not view.value:
+                return
+
+        if await countryball.is_locked():
+            await interaction.followup.send(
+                f"This {settings.collectible_name} is currently in an active trade or donation, "
+                "please try again later.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            # Get or create the target player
+            target_player = await Player.get_or_create(discord_id=user.id)
+            if isinstance(target_player, tuple):
+                target_player = target_player[0]
+
+            # Lock the item
+            await countryball.lock()
+
+            # Transfer ownership
+            countryball.favorite = False
+            countryball.trade_player = countryball.player
+            countryball.player = target_player
+            await countryball.save()
+
+            # Record as trade for statistics
+            trade = await Trade.create(player1=countryball.trade_player, player2=target_player)
+            await TradeObject.create(
+                trade=trade, ballinstance=countryball, player=countryball.trade_player
+            )
+
+            # Unlock the item
+            await countryball.unlock()
+
+            await interaction.followup.send(
+                f"You gave **{countryball.countryball.country}** to {user.mention}!",
+                ephemeral=True,
+            )
+
+            # Try to DM the recipient
+            try:
+                await user.send(
+                    f"{interaction.user.mention} gave you a **{countryball.countryball.country}** "
+                    f"{settings.collectible_name}! Check your inventory with `/nba inventory`."
+                )
+            except discord.Forbidden:
+                pass  # User has DMs disabled, silently ignore
+
+        except DoesNotExist:
+            await countryball.unlock()
+            await interaction.followup.send(
+                f"The target player could not be found.",
+                ephemeral=True,
+            )
+        except Exception as e:
+            # Ensure the item is unlocked if ANY error occurs
+            await countryball.unlock()
+            log.error(f"Error in give command for {countryball}: {e}")
+            await interaction.followup.send(
+                f"An error occurred while giving the {settings.collectible_name}. "
+                f"It has been returned to your inventory.",
+                ephemeral=True,
+            )
