@@ -1021,22 +1021,32 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 
         await countryball.lock_for_trade()
 
-        from ballsdex.packages.countryballs.countryball import BallSpawnView
-        
-        spawn_view = await BallSpawnView.from_existing(self.bot, countryball)
-        
-        channel = cast(discord.TextChannel, interaction.channel)
-        success = await spawn_view.spawn(channel)
-        
-        if success:
-            await interaction.followup.send(
-                f"You dropped **{countryball.countryball.country}**! "
-                f"Anyone can now catch it, including you (but that would be cheap!).",
-                ephemeral=True,
-            )
-        else:
+        try:
+            from ballsdex.packages.countryballs.countryball import BallSpawnView
+            
+            spawn_view = await BallSpawnView.from_existing(self.bot, countryball)
+            
+            channel = cast(discord.TextChannel, interaction.channel)
+            success = await spawn_view.spawn(channel)
+            
+            if success:
+                await interaction.followup.send(
+                    f"You dropped **{countryball.countryball.country}**! "
+                    f"Anyone can now catch it, including you (but that would be cheap!).",
+                    ephemeral=True,
+                )
+            else:
+                await countryball.unlock()
+                await interaction.followup.send(
+                    f"Failed to drop the {settings.collectible_name}. Please try again.",
+                    ephemeral=True,
+                )
+        except Exception as e:
+            # Ensure the item is unlocked if ANY error occurs
             await countryball.unlock()
+            log.error(f"Error in drop command for {countryball}: {e}")
             await interaction.followup.send(
-                f"Failed to drop the {settings.collectible_name}. Please try again.",
+                f"An error occurred while dropping the {settings.collectible_name}. "
+                f"It has been returned to your inventory.",
                 ephemeral=True,
             )
