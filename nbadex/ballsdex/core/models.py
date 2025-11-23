@@ -466,6 +466,7 @@ class Player(models.Model):
         description="How you want to handle trade accept cooldown",
         default=TradeCooldownPolicy.COOLDOWN,
     )
+    coins = fields.IntField(description="Player coin balance", default=0)
     extra_data = fields.JSONField(default=dict)
     balls: fields.BackwardFKRelation[BallInstance]
 

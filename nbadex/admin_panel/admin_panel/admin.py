@@ -8,3 +8,7 @@ class BallsdexAdminSite(admin.AdminSite):
     site_title = f"{settings.bot_name} admin panel"
     site_url = None  # type: ignore
     final_catch_all_view = False
+
+
+# Create a default site instance for use in apps
+site = admin.site
