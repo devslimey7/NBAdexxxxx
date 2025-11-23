@@ -1083,30 +1083,53 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 )
                 return
 
-            # Create embed
+            # Calculate global stats
+            total_collected = sum(count for _, count in top_10)
+            max_count = top_10[0][1] if top_10 else 0
+
+            # Create embed with professional styling
             embed = discord.Embed(
-                title=f"🏆 Top 10 {settings.plural_collectible_name.title()} Collectors",
-                color=discord.Color.gold(),
-                description="Global leaderboard ranked by number of NBAs collected",
+                title="🏆 NBA COLLECTORS LEADERBOARD",
+                color=0x1f8b4c,  # Professional green
+            )
+            
+            # Add header with stats
+            embed.add_field(
+                name="📊 GLOBAL STATS",
+                value=f"**Top Players:** {len(top_10)}\n**Total Collected:** {total_collected}\n**Highest:** {max_count}",
+                inline=False
             )
 
-            # Build leaderboard
+            # Build professional leaderboard
             leaderboard_text = ""
             medals = ["🥇", "🥈", "🥉"]
+            rank_icons = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
             
             for idx, (player, count) in enumerate(top_10, 1):
                 try:
-                    # Try to fetch user for mention
                     user = await self.bot.fetch_user(player.discord_id)
-                    mention = user.mention
+                    name = f"**{user.name}**"
                 except discord.NotFound:
-                    mention = f"<@{player.discord_id}>"
+                    name = f"**Unknown User**"
                 
-                medal = medals[idx - 1] if idx <= 3 else f"#{idx}"
-                leaderboard_text += f"{medal} {mention} — **{count}** {settings.plural_collectible_name}\n"
+                # Determine medal/rank icon
+                medal = medals[idx - 1] if idx <= 3 else rank_icons[idx - 1]
+                
+                # Calculate progress bar (relative to max)
+                bar_length = 15
+                filled = int((count / max_count) * bar_length) if max_count > 0 else 0
+                bar = "▰" * filled + "▱" * (bar_length - filled)
+                
+                leaderboard_text += f"{medal} {name}\n{bar} **{count}**\n\n"
             
-            embed.description = leaderboard_text
-            embed.set_footer(text="Global stats across all servers")
+            embed.add_field(
+                name="🏅 RANKINGS",
+                value=leaderboard_text,
+                inline=False
+            )
+            
+            embed.set_footer(text="Global rankings • Updated in real-time")
+            embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
 
             await interaction.followup.send(embed=embed)
 
