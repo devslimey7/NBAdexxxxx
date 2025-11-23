@@ -427,7 +427,7 @@ class BallSpawnView(View):
         if new_ball:
             text += (
                 f"This is a **new {settings.collectible_name}** "
-                "that has been added to your completion!"
+                "that has been added to your completion!\n"
             )
         if self.ballinstance:
             if ball.player.discord_id == self.og_id:
