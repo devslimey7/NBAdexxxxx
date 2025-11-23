@@ -187,22 +187,29 @@ class BallInstance(models.Model):
     id = models.BigAutoField(primary_key=True)
     ball = models.ForeignKey(Ball, on_delete=models.CASCADE)
     player = models.ForeignKey(Player, on_delete=models.CASCADE)
-    server_id = models.BigIntegerField(help_text="Guild ID where the NBA was caught")
-    catch_date = models.DateTimeField(auto_now_add=True)
-    shiny = models.BooleanField(default=False, help_text="Is this a shiny variant?")
+    server_id = models.BigIntegerField()
+    catch_date = models.DateTimeField()
+    spawned_time = models.DateTimeField(null=True, blank=True)
+    health_bonus = models.IntegerField(default=0)
+    attack_bonus = models.IntegerField(default=0)
+    favorite = models.BooleanField(default=False)
+    tradeable = models.BooleanField(default=True)
+    locked = models.DateTimeField(null=True, blank=True)
+    extra_data = models.JSONField(default=dict, blank=True)
+    deleted = models.BooleanField(default=False)
     special = models.ForeignKey(Special, on_delete=models.SET_NULL, null=True, blank=True)
-    obtained_by_trade = models.BooleanField(default=False, help_text="Was this NBA obtained by trade?")
+    trade_player = models.ForeignKey(Player, on_delete=models.SET_NULL, null=True, blank=True, related_name="traded_cards")
 
     @admin.display(description="Description")
     def description(self) -> str:
-        return f"#{self.id} {self.ball.emoji}"
+        return f"#{self.id} {self.ball.country}"
 
     @admin.display(description="Catch Time")
     def catch_time(self) -> str:
         return format_dt(self.catch_date, "R") if self.catch_date else "Unknown"
 
     def __str__(self) -> str:
-        return f"#{self.id} - {self.ball.name} {self.ball.emoji}"
+        return f"#{self.id} - {self.ball.country}"
 
     class Meta:
         managed = True

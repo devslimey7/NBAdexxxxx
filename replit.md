@@ -12,6 +12,14 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 23, 2025)
 
+## Critical Schema Fixes (Session Update)
+- **Fixed Django Model Schema Mismatches** - Models now match actual PostgreSQL database
+  - Ball model: `country` (was `name`), `emoji_id` (was `emoji`), `health`/`attack` (was `hp`/`atk`)
+  - Added missing fields: `short_name`, `wild_card`, `collection_card`, `credits`, `capacity_*`, `translations`, `tradeable`, `created_at`
+  - BallInstance model: Added all missing fields (`tradeable`, `health_bonus`, `attack_bonus`, `spawned_time`, `locked`, `extra_data`, `deleted`, `trade_player`)
+  - CoinReward/PackReward models: Fixed to match exact database schema (nullable descriptions, ForeignKey vs OneToOneField)
+- **Result**: Admin panel now runs error-free on all sections
+
 ## New Features
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
   - Location: `ballsdex/packages/balls/cog.py` (lines 969-1045)
@@ -62,8 +70,8 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 ## Technical Implementation Notes
 - **Tortoise ORM Schema Handling**: catch_value column is NOT in Tortoise Ball model definition (avoided schema caching issues with asyncpg)
 - **Access Pattern**: Raw SQL queries fetch catch_value when needed in catch_ball method
-- **Admin Panel**: Django ORM model includes catch_value field for easy configuration via admin interface
-- **Separation of Concerns**: Bot uses raw SQL, admin panel uses Django ORM for the same column
+- **Admin Panel**: Django ORM models now fully match PostgreSQL schema for reliable admin interface
+- **Separation of Concerns**: Bot uses raw SQL for economy, admin panel uses Django ORM for configuration
 
 # User Preferences
 
