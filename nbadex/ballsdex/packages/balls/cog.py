@@ -1148,15 +1148,6 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 ephemeral=True,
             )
 
-            # Try to DM the recipient
-            try:
-                await user.send(
-                    f"{interaction.user.mention} gave you a **{countryball.countryball.country}** "
-                    f"{settings.collectible_name}! Check your inventory with `/nba inventory`."
-                )
-            except discord.Forbidden:
-                pass  # User has DMs disabled, silently ignore
-
         except DoesNotExist:
             await countryball.unlock()
             await interaction.followup.send(
