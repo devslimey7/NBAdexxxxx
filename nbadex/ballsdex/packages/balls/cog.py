@@ -1132,23 +1132,6 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             # Get or create player
             player, _ = await Player.get_or_create(discord_id=interaction.user.id)
             
-            # Check if already claimed today
-            last_claim = player.extra_data.get("last_claim_date")
-            now = datetime.now()
-            
-            if last_claim:
-                last_claim_dt = datetime.fromisoformat(last_claim)
-                # Check if less than 24 hours have passed
-                if (now - last_claim_dt).total_seconds() < 86400:
-                    seconds_left = 86400 - (now - last_claim_dt).total_seconds()
-                    hours_left = int(seconds_left // 3600)
-                    minutes_left = int((seconds_left % 3600) // 60)
-                    await interaction.followup.send(
-                        f"You've already claimed your daily reward! Come back in **{hours_left}h {minutes_left}m**.",
-                        ephemeral=True,
-                    )
-                    return
-            
             # Get all enabled balls with their rarities
             all_balls = await Ball.all().filter(enabled=True)
             
