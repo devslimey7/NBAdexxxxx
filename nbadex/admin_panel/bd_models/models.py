@@ -170,7 +170,6 @@ class Ball(models.Model):
     health = models.IntegerField(default=0)
     enabled = models.BooleanField(default=True)
     tradeable = models.BooleanField(default=True)
-    catch_value = models.IntegerField(default=10, help_text="Coins awarded when this NBA is caught")
     created_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
