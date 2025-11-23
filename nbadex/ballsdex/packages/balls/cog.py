@@ -1055,111 +1055,63 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             )
 
     @app_commands.command()
-    @app_commands.checks.cooldown(1, 5)
-    async def give(
-        self,
-        interaction: discord.Interaction["BallsDexBot"],
-        countryball: BallInstanceTransform,
-        user: discord.User,
-        special: SpecialEnabledTransform | None = None,
-    ):
+    async def leaderboard(self, interaction: discord.Interaction["BallsDexBot"]):
         """
-        Give a countryball to another player instantly.
-
-        Parameters
-        ----------
-        countryball: BallInstance
-            The countryball you want to give
-        user: discord.User
-            The player to give the countryball to
-        special: Special
-            Filter the results of autocompletion to a special event. Ignored afterwards.
+        Display the top 10 players ranked by NBA count globally.
         """
-        if not countryball:
-            await interaction.response.send_message(
-                f"You don't have this {settings.collectible_name}.", ephemeral=True
-            )
-            return
-
-        if user.id == interaction.user.id:
-            await interaction.response.send_message(
-                f"You can't give a {settings.collectible_name} to yourself!", ephemeral=True
-            )
-            return
-
-        if not countryball.is_tradeable:
-            await interaction.response.send_message(
-                f"You cannot give this {settings.collectible_name}.", ephemeral=True
-            )
-            return
-
         await interaction.response.defer(thinking=True)
 
-        if countryball.favorite:
-            view = ConfirmChoiceView(
-                interaction,
-                accept_message=f"{settings.collectible_name.title()} given successfully.",
-                cancel_message="Give cancelled.",
-            )
-            await interaction.followup.send(
-                f"This {settings.collectible_name} is a favorite, "
-                "are you sure you want to give it away?",
-                view=view,
-                ephemeral=True,
-            )
-            await view.wait()
-            if not view.value:
+        try:
+            # Get all players with their NBA counts
+            players = await Player.all().prefetch_related("balls")
+            
+            # Count NBAs for each player and sort
+            player_counts = []
+            for player in players:
+                count = len(player.balls)
+                if count > 0:  # Only include players with at least 1 NBA
+                    player_counts.append((player, count))
+            
+            # Sort by count descending and take top 10
+            top_10 = sorted(player_counts, key=lambda x: x[1], reverse=True)[:10]
+            
+            if not top_10:
+                await interaction.followup.send(
+                    "No players found with any NBAs yet.",
+                    ephemeral=True,
+                )
                 return
 
-        if await countryball.is_locked():
-            await interaction.followup.send(
-                f"This {settings.collectible_name} is currently in an active trade or donation, "
-                "please try again later.",
-                ephemeral=True,
-            )
-            return
-
-        try:
-            # Get or create the target player
-            target_player = await Player.get_or_create(discord_id=user.id)
-            if isinstance(target_player, tuple):
-                target_player = target_player[0]
-
-            # Lock the item
-            await countryball.lock()
-
-            # Transfer ownership
-            countryball.favorite = False
-            countryball.trade_player = countryball.player
-            countryball.player = target_player
-            await countryball.save()
-
-            # Record as trade for statistics
-            trade = await Trade.create(player1=countryball.trade_player, player2=target_player)
-            await TradeObject.create(
-                trade=trade, ballinstance=countryball, player=countryball.trade_player
+            # Create embed
+            embed = discord.Embed(
+                title=f"🏆 Top 10 {settings.plural_collectible_name.title()} Collectors",
+                color=discord.Color.gold(),
+                description="Global leaderboard ranked by number of NBAs collected",
             )
 
-            # Unlock the item
-            await countryball.unlock()
+            # Build leaderboard
+            leaderboard_text = ""
+            medals = ["🥇", "🥈", "🥉"]
+            
+            for idx, (player, count) in enumerate(top_10, 1):
+                try:
+                    # Try to fetch user for mention
+                    user = await self.bot.fetch_user(player.discord_id)
+                    mention = user.mention
+                except discord.NotFound:
+                    mention = f"<@{player.discord_id}>"
+                
+                medal = medals[idx - 1] if idx <= 3 else f"#{idx}"
+                leaderboard_text += f"{medal} {mention} — **{count}** {settings.plural_collectible_name}\n"
+            
+            embed.description = leaderboard_text
+            embed.set_footer(text="Global stats across all servers")
 
-            await interaction.followup.send(
-                f"You gave **{countryball.countryball.country}** to {user.mention}!",
-                ephemeral=True,
-            )
+            await interaction.followup.send(embed=embed)
 
-        except DoesNotExist:
-            await countryball.unlock()
-            await interaction.followup.send(
-                f"The target player could not be found.",
-                ephemeral=True,
-            )
         except Exception as e:
-            # Ensure the item is unlocked if ANY error occurs
-            await countryball.unlock()
-            log.error(f"Error in give command for {countryball}: {e}")
+            log.error(f"Error in leaderboard command: {e}")
             await interaction.followup.send(
-                f"An error occurred while giving the {settings.collectible_name}. "
-                f"It has been returned to your inventory.",
+                "An error occurred while fetching the leaderboard.",
                 ephemeral=True,
             )
