@@ -1,0 +1,37 @@
+u just have to clone it and make it NBAdex collectibles will be nba I want u to clone it as is and just don't take much time if errors then don't waste time I want u to do it asap and set up admin panel too 100% accurately with not glitched and error so I can add stuff and make sure slash commands work perfectly and no mistakes at all like perfect clone make sure the it's nba not NBA players so the commands work and sync properly 
+
+owner: 1135233173840732230
+
+and the main guild will be: 1440962506796433519
+
+the role id for admin commands: 1440962579051712642
+
+the discord bot token: MTQ0MjIzOTg3NTUwMjk2OTAzNA.G7AcO-.5_ldka1DBlHlOOV00dWUxZS4d4XE8MtC-_gahc
+
+admin panel username password will be
+
+username: Nba6969pa
+password: Jaffar69
+
+and I'm attaching this screenshot this what happens when u set up the admin panel please make it 100 percent assesible and I don't need to tell u again and again make it 100% workable
+
+and one more most important thing last time I made this u only made admin panel workflow I need u to make both workflows and progress at the same time like both should be running here and 100% accurate not only admin panel
+
+and the most important thing? do it asap like don't take much time and waste credits like do it perfect and fast
+
+database: postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+
+and the last thing that u will do after everything and important:
+this is a public command not admin this can be used by anyone anywhere
+only do it when everything else is already perfect and set up this command doesn't exist so
+add a new command (this is very serious so do it 100% carefully)
+/nba drop
+by this a player can drop a instance/card they have in their collection and others can catch it.
+and when they /nba info that card it should show as obtained by trade with the person who dropped it cause basically you know what i mean...
+when someone catch a card they drop themselves add like this to the message message:
+You caught your own drop? What a cheap thing to do.
+
+I am adding a screenshot of this command (it exists in a bit already so I am adding this so u will know what to do
+make sure this command is 100% working and glitch/bug free do it perfectly
+last time all the bot was set but there was a problem in drop command I'm adding the screenshot make sure there is no problem this time
