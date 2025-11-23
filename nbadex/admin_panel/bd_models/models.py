@@ -126,7 +126,6 @@ class Economy(models.Model):
 
 class Regime(models.Model):
     name = models.CharField(max_length=64)
-    icon = models.ImageField(max_length=200)
 
     def __str__(self) -> str:
         return self.name

@@ -17,14 +17,8 @@ if TYPE_CHECKING:
 
 @admin.register(Regime)
 class RegimeAdmin(admin.ModelAdmin):
-    list_display = ("name", "regime_icon", "pk")
+    list_display = ("name", "pk")
     search_fields = ("name",)
-
-    @admin.display(description="Icon")
-    def regime_icon(self, obj: Regime):
-        return mark_safe(
-            f'<img src="/media/{transform_media(str(obj.icon))}" height=60px />'
-        )
 
     def get_deleted_objects(
         self, objs: "QuerySet[Regime]", request: "HttpRequest"
