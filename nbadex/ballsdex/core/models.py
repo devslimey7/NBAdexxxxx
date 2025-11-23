@@ -466,7 +466,6 @@ class Player(models.Model):
         description="How you want to handle trade accept cooldown",
         default=TradeCooldownPolicy.COOLDOWN,
     )
-    coins = fields.IntField(description="Player coin balance", default=0)
     extra_data = fields.JSONField(default=dict)
     balls: fields.BackwardFKRelation[BallInstance]
 
@@ -600,48 +599,3 @@ class Block(models.Model):
 
     def __str__(self) -> str:
         return str(self.pk)
-
-
-class Pack(models.Model):
-    """Represents a pack that players can buy and open"""
-    id: int
-    name = fields.CharField(max_length=64, description="Pack name")
-    description = fields.TextField(null=True, default=None, description="Pack description")
-    cost = fields.IntField(default=0, description="Coin cost to buy this pack")
-    enabled = fields.BooleanField(default=True, description="Whether this pack is available")
-    pack_rewards: fields.ReverseRelation[PackReward]
-    player_packs: fields.ReverseRelation[PlayerPack]
-
-    def __str__(self) -> str:
-        return self.name
-
-
-class PackReward(models.Model):
-    """Represents a possible reward from opening a pack"""
-    id: int
-    pack: fields.ForeignKeyRelation[Pack] = fields.ForeignKeyField(
-        "models.Pack", related_name="pack_rewards"
-    )
-    ball: fields.ForeignKeyRelation[Ball] = fields.ForeignKeyField(
-        "models.Ball", related_name="pack_rewards"
-    )
-    weight = fields.IntField(default=1, description="Drop rate weight (higher = more likely)")
-
-    def __str__(self) -> str:
-        return f"{self.pack.name} -> {self.ball.country}"
-
-
-class PlayerPack(models.Model):
-    """Represents packs owned by players"""
-    id: int
-    player: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
-        "models.Player", related_name="player_packs"
-    )
-    pack: fields.ForeignKeyRelation[Pack] = fields.ForeignKeyField(
-        "models.Pack", related_name="player_packs"
-    )
-    quantity = fields.IntField(default=1, description="Number of this pack owned")
-    created_at = fields.DatetimeField(auto_now_add=True)
-
-    def __str__(self) -> str:
-        return f"{self.player} - {self.pack.name} x{self.quantity}"
