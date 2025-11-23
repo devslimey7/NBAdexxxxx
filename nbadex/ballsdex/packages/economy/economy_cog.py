@@ -208,10 +208,38 @@ class Economy(commands.Cog):
     @app_commands.describe(pack="Select a pack to open")
     @app_commands.autocomplete(pack=pack_autocomplete)
     async def pack_open(self, interaction: discord.Interaction, pack: str):
-        """Open a pack (admin configured via admin panel)"""
+        """Open a pack and receive rewards"""
         try:
+            # Get pack with its reward configuration
+            pack_obj = await Pack.filter(name=pack, enabled=True).prefetch_related("reward").first()
+            if not pack_obj:
+                await interaction.response.send_message(
+                    f"Pack '{pack}' not found or is disabled.", ephemeral=True
+                )
+                return
+            
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            # Get reward configuration
+            reward = await pack_obj.reward
+            if not reward:
+                await interaction.response.send_message(
+                    f"Pack '{pack}' has no rewards configured. Contact an admin!", ephemeral=True
+                )
+                return
+            
+            # Award coins
+            player.coins += reward.coins
+            await player.save(update_fields=("coins",))
+            
+            await CoinTransaction.create(
+                player=player, amount=reward.coins, reason=f"Pack Reward: {pack_obj.name}"
+            )
+            
             await interaction.response.send_message(
-                f"📦 Opening **{pack}**... (Contents configured in admin panel)",
+                f"✅ Opened **{pack_obj.name}**!\n"
+                f"🎁 You received: **{reward.coins:,}** coins\n"
+                f"💰 New balance: **{player.coins:,}** coins",
                 ephemeral=True,
             )
         except Exception as e:
