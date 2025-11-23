@@ -1123,7 +1123,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         """
         Claim your daily NBA reward.
         """
-        await interaction.response.defer(thinking=True)
+        await interaction.response.defer(thinking=True, ephemeral=True)
 
         try:
             from datetime import datetime, timedelta
