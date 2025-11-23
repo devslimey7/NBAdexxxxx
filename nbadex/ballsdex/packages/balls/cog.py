@@ -1128,10 +1128,15 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         try:
             import random
             from datetime import datetime
+            import logging
+            
+            log.info("Claim command started")
             
             # Get or create player
             player, _ = await Player.get_or_create(discord_id=interaction.user.id)
             now = datetime.now()
+            
+            log.info(f"Player {interaction.user.id} attempting claim")
             
             # Check if already claimed today (24-hour cooldown)
             last_claim = player.extra_data.get("last_claim_date")
@@ -1139,7 +1144,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 last_claim_dt = datetime.fromisoformat(last_claim)
                 time_since_claim = (now - last_claim_dt).total_seconds()
                 if time_since_claim < 86400:  # 24 hours = 86400 seconds
+                    log.info(f"Player {interaction.user.id} tried to claim within cooldown")
                     return
+            
+            log.info("Getting all balls")
             
             # Get all enabled balls with their rarities
             all_balls = await Ball.all().filter(enabled=True)
@@ -1173,6 +1181,8 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 -settings.max_health_bonus, settings.max_health_bonus
             )
             
+            log.info("Creating ball instance")
+            
             # Create the ball instance
             ball_instance = await BallInstance.create(
                 ball=selected_ball,
@@ -1181,12 +1191,18 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 health_bonus=health_bonus,
             )
             
+            log.info("Updating claim date")
+            
             # Update last claim date
             player.extra_data["last_claim_date"] = now.isoformat()
             await player.save()
             
+            log.info("Preparing message")
+            
             # Generate and send the card image with congratulations
             content, file, view = await ball_instance.prepare_for_message(interaction)
+            
+            log.info("Sending response")
             
             congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*"
             
@@ -1196,7 +1212,9 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 view=view,
                 ephemeral=True,
             )
+            log.info("Closing file")
             file.close()
+            log.info("Claim complete")
             
         except Exception as e:
             log.error(f"Error in claim command: {e}")
