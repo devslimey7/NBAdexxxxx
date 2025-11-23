@@ -178,6 +178,8 @@ class Ball(models.Model):
     class Meta:
         managed = True
         db_table = "ball"
+        verbose_name = "NBA"
+        verbose_name_plural = "NBAs"
 
 
 class BallInstance(models.Model):
@@ -204,6 +206,8 @@ class BallInstance(models.Model):
     class Meta:
         managed = True
         db_table = "ballinstance"
+        verbose_name = "NBA Card"
+        verbose_name_plural = "NBA Cards"
 
 
 class Trade(models.Model):

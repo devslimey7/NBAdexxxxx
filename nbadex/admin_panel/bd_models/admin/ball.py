@@ -84,42 +84,31 @@ class EconomyAdmin(admin.ModelAdmin):
 @admin.register(Ball)
 class BallAdmin(admin.ModelAdmin):
     autocomplete_fields = ("regime", "economy")
-    readonly_fields = ("collection_image", "spawn_image")
     save_on_top = True
     fieldsets = [
         (
             None,
             {
                 "fields": [
-                    "country",
-                    "health",
-                    "attack",
+                    "name",
+                    "hp",
+                    "atk",
                     "rarity",
-                    "emoji_id",
+                    "emoji",
                     "economy",
                     "regime",
                 ],
             },
         ),
         (
-            "Assets",
+            "Details",
             {
-                "description": "You must have permission from the copyright holder "
-                "to use the files you're uploading!",
                 "fields": [
-                    "spawn_image",
-                    "wild_card",
-                    "collection_image",
-                    "collection_card",
-                    "credits",
+                    "catch_phrase",
+                    "catch_names",
+                    "description",
+                    "image_url",
                 ],
-            },
-        ),
-        (
-            "Ability",
-            {
-                "description": "The ability of the countryball",
-                "fields": ["capacity_name", "capacity_description"],
             },
         ),
         (
@@ -136,42 +125,31 @@ class BallAdmin(admin.ModelAdmin):
                 "classes": ["collapse"],
                 "fields": [
                     "enabled",
-                    "tradeable",
-                    "short_name",
-                    "catch_names",
-                    "translations",
-                    "capacity_logic",
                 ],
             },
         ),
     ]
 
     list_display = [
-        "country",
+        "name",
         "pk",
         "emoji",
         "rarity",
-        "capacity_name",
-        "health",
-        "attack",
+        "hp",
+        "atk",
         "enabled",
     ]
     list_editable = ["enabled", "rarity"]
-    list_filter = ["enabled", "tradeable", "regime", "economy", "created_at"]
-    ordering = ["-created_at"]
+    list_filter = ["enabled", "regime", "economy"]
 
     search_fields = [
-        "country",
-        "capacity_name",
-        "capacity_description",
+        "name",
         "catch_names",
-        "translations",
-        "credits",
+        "description",
         "pk",
     ]
     search_help_text = (
-        "Search for countryball name, ID, ability name/content, "
-        "credits, catch names or translations"
+        "Search for NBA name, ID, catch names or description"
     )
 
     @admin.display(description="Emoji")
