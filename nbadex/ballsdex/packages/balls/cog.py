@@ -1127,9 +1127,26 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 
         try:
             import random
+            from datetime import datetime
             
             # Get or create player
             player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            now = datetime.now()
+            
+            # Check if already claimed today (24-hour cooldown)
+            last_claim = player.extra_data.get("last_claim_date")
+            if last_claim:
+                last_claim_dt = datetime.fromisoformat(last_claim)
+                time_since_claim = (now - last_claim_dt).total_seconds()
+                if time_since_claim < 86400:  # 24 hours = 86400 seconds
+                    seconds_left = 86400 - time_since_claim
+                    hours_left = int(seconds_left // 3600)
+                    minutes_left = int((seconds_left % 3600) // 60)
+                    await interaction.followup.send(
+                        f"You've already claimed your daily reward! Come back in **{hours_left}h {minutes_left}m**.",
+                        ephemeral=True,
+                    )
+                    return
             
             # Get all enabled balls with their rarities
             all_balls = await Ball.all().filter(enabled=True)
@@ -1170,6 +1187,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 attack_bonus=attack_bonus,
                 health_bonus=health_bonus,
             )
+            
+            # Update last claim date
+            player.extra_data["last_claim_date"] = now.isoformat()
+            await player.save()
             
             # Generate and send the card image with simple message
             content, file, view = await ball_instance.prepare_for_message(interaction)
