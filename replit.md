@@ -19,6 +19,20 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
   - Automatically tracked as "obtained by trade" in `/nba info`
 
+- **Economy System** (`/coins` and `/packs` commands): Full coin-based economy
+  - Location: `ballsdex/packages/economy/` (new package)
+  - Database models: `Player.coins`, `Pack`, `CoinTransaction`
+  - Admin panel models: `Pack`, `CoinTransaction` for configuration and history tracking
+  - Command groups:
+    - `/coins balance` - Check your coin balance
+    - `/coins leaderboard` - View top 10 players by coins
+    - `/packs info` - See available packs and descriptions
+    - `/packs buy <pack_name>` - Purchase a pack with coins
+    - `/packs open <pack_name>` - Open a pack (admin configured via admin panel)
+    - `/pack give <user> <amount>` - Transfer coins to another player
+  - Transaction tracking for all coin movements
+  - Configuration: All coin rewards and pack contents managed entirely through admin panel
+
 ## Production Deployment
 - Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
 - Collected 135 static files for production serving
