@@ -17,8 +17,14 @@ if TYPE_CHECKING:
 
 @admin.register(Regime)
 class RegimeAdmin(admin.ModelAdmin):
-    list_display = ("name", "pk")
+    list_display = ("name", "background_image", "pk")
     search_fields = ("name",)
+
+    @admin.display()
+    def background_image(self, obj: Regime):
+        return mark_safe(
+            f'<img src="/media/{transform_media(str(obj.background))}" height=60px />'
+        )
 
     def get_deleted_objects(
         self, objs: "QuerySet[Regime]", request: "HttpRequest"
@@ -78,6 +84,7 @@ class EconomyAdmin(admin.ModelAdmin):
 @admin.register(Ball)
 class BallAdmin(admin.ModelAdmin):
     autocomplete_fields = ("regime", "economy")
+    readonly_fields = ("collection_image", "spawn_image")
     save_on_top = True
     fieldsets = [
         (
@@ -95,14 +102,24 @@ class BallAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Details",
+            "Assets",
             {
+                "description": "You must have permission from the copyright holder "
+                "to use the files you're uploading!",
                 "fields": [
-                    "capacity_name",
-                    "capacity_description",
-                    "catch_names",
-                    "short_name",
+                    "spawn_image",
+                    "wild_card",
+                    "collection_image",
+                    "collection_card",
+                    "credits",
                 ],
+            },
+        ),
+        (
+            "Ability",
+            {
+                "description": "The ability of the countryball",
+                "fields": ["capacity_name", "capacity_description"],
             },
         ),
         (
@@ -113,11 +130,10 @@ class BallAdmin(admin.ModelAdmin):
                 "fields": [
                     "enabled",
                     "tradeable",
-                    "wild_card",
-                    "collection_card",
-                    "credits",
-                    "capacity_logic",
+                    "short_name",
+                    "catch_names",
                     "translations",
+                    "capacity_logic",
                 ],
             },
         ),
@@ -126,21 +142,29 @@ class BallAdmin(admin.ModelAdmin):
     list_display = [
         "country",
         "pk",
+        "emoji",
         "rarity",
+        "capacity_name",
         "health",
         "attack",
         "enabled",
     ]
     list_editable = ["enabled", "rarity"]
-    list_filter = ["enabled", "tradeable", "regime", "economy"]
+    list_filter = ["enabled", "tradeable", "regime", "economy", "created_at"]
+    ordering = ["-created_at"]
 
     search_fields = [
         "country",
+        "capacity_name",
+        "capacity_description",
         "catch_names",
+        "translations",
+        "credits",
         "pk",
     ]
     search_help_text = (
-        "Search for NBA name, ID or catch names"
+        "Search for countryball name, ID, ability name/content, "
+        "credits, catch names or translations"
     )
 
     @admin.display(description="Emoji")

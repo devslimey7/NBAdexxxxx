@@ -467,7 +467,6 @@ class Player(models.Model):
         default=TradeCooldownPolicy.COOLDOWN,
     )
     extra_data = fields.JSONField(default=dict)
-    coins = fields.BigIntField(default=0, description="Player's coin balance")
     balls: fields.BackwardFKRelation[BallInstance]
 
     def __str__(self) -> str:
@@ -600,28 +599,3 @@ class Block(models.Model):
 
     def __str__(self) -> str:
         return str(self.pk)
-
-
-class Pack(models.Model):
-    name = fields.CharField(max_length=64, unique=True, description="Pack name (e.g., Common, Rare)")
-    cost = fields.IntField(description="Coin cost to buy this pack")
-    description = fields.TextField(description="Pack description for /packs info command")
-    enabled = fields.BooleanField(default=True, description="Whether this pack can be purchased")
-
-    def __str__(self) -> str:
-        return f"{self.name} ({self.cost} coins)"
-
-
-class CoinTransaction(models.Model):
-    player: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
-        "models.Player", related_name="transactions"
-    )
-    amount = fields.BigIntField(description="Coin amount (positive for gain, negative for loss)")
-    reason = fields.CharField(max_length=128, description="Why coins were gained/lost (e.g., 'Pack Purchase', 'Admin Reward')")
-    timestamp = fields.DatetimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [PostgreSQLIndex(fields=("player_id",))]
-
-    def __str__(self) -> str:
-        return f"{self.player}: {self.amount:+d} coins ({self.reason})"

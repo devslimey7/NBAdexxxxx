@@ -393,25 +393,6 @@ class BallSpawnView(View):
             spawned_time=self.message.created_at,
         )
 
-        # Award coins based on ball's catch_value (fetched from DB via raw query)
-        try:
-            from tortoise import Tortoise
-            conn = Tortoise.get_connection("default")
-            catch_value = await conn.execute_query_single(
-                "SELECT catch_value FROM ball WHERE id = $1", [self.model.id]
-            ) or (10,)
-            coin_reward = catch_value[0] if catch_value else 10
-            
-            player.coins += coin_reward
-            await player.save(update_fields=("coins",))
-            await CoinTransaction.create(
-                player=player,
-                amount=coin_reward,
-                reason=f"Caught {self.model.country}"
-            )
-        except Exception as e:
-            log.warning(f"Failed to award coins for catching {self.model.country}: {e}")
-
         # logging and stats
         log.log(
             logging.INFO if user.id in self.bot.catch_log else logging.DEBUG,

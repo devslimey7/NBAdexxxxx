@@ -87,7 +87,6 @@ class Player(models.Model):
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
     extra_data = models.JSONField(blank=True, default=dict)
-    coins = models.BigIntegerField(default=0, help_text="Player's coin balance")
 
     def is_blacklisted(self) -> bool:
         blacklist = cast(
@@ -126,6 +125,7 @@ class Economy(models.Model):
 
 class Regime(models.Model):
     name = models.CharField(max_length=64)
+    background = models.ImageField(max_length=200, help_text="1428x2000 PNG image")
 
     def __str__(self) -> str:
         return self.name
@@ -137,7 +137,37 @@ class Regime(models.Model):
 
 class Special(models.Model):
     name = models.CharField(max_length=64)
-    id = models.BigAutoField(primary_key=True, help_text="Use the same ID as the special event")
+    catch_phrase = models.CharField(
+        max_length=128,
+        blank=True,
+        null=True,
+        help_text="Sentence sent in bonus when someone catches a special card",
+    )
+    start_date = models.DateTimeField(
+        blank=True, null=True, help_text="Start time of the event. If blank, starts immediately"
+    )
+    end_date = models.DateTimeField(
+        blank=True, null=True, help_text="End time of the event. If blank, the event is permanent"
+    )
+    rarity = models.FloatField(
+        help_text="Value between 0 and 1, chances of using this special background."
+    )
+    emoji = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Either a unicode character or a discord emoji ID",
+    )
+    background = models.ImageField(
+        max_length=200, blank=True, null=True, help_text="1428x2000 PNG image"
+    )
+    tradeable = models.BooleanField(
+        help_text="Whether balls of this event can be traded", default=True
+    )
+    hidden = models.BooleanField(help_text="Hides the event from user commands", default=False)
+    credits = models.CharField(
+        max_length=64, help_text="Author of the special event artwork", null=True
+    )
 
     def __str__(self) -> str:
         return self.name
@@ -148,108 +178,166 @@ class Special(models.Model):
 
 
 class Ball(models.Model):
-    country = models.CharField(max_length=64, help_text="NBA collectible name (e.g., LeBron James)")
-    economy = models.ForeignKey(Economy, on_delete=models.PROTECT)
-    regime = models.ForeignKey(Regime, on_delete=models.PROTECT)
-    rarity = models.FloatField(help_text="How rare is this NBA (0-1, where 1 is most common)")
-    emoji_id = models.BigIntegerField()
-    catch_names = models.CharField(
+    country = models.CharField(unique=True, max_length=48, verbose_name="Name")
+    health = models.IntegerField(help_text="Ball health stat")
+    attack = models.IntegerField(help_text="Ball attack stat")
+    rarity = models.FloatField(help_text="Rarity of this ball")
+    emoji_id = models.BigIntegerField(help_text="Emoji ID for this ball")
+    wild_card = models.ImageField(
         max_length=200,
-        blank=True,
-        help_text="Catch names separated by semicolons (e.g., 'lebron; bron; king james')",
+        help_text="Image used when a new ball spawns in the wild",
     )
-    short_name = models.CharField(max_length=64, blank=True, null=True)
+    collection_card = models.ImageField(
+        max_length=200, help_text="Image used when displaying balls"
+    )
+    credits = models.CharField(max_length=64, help_text="Author of the collection artwork")
+    capacity_name = models.CharField(max_length=64, help_text="Name of the countryball's capacity")
+    capacity_description = models.CharField(
+        max_length=256, help_text="Description of the countryball's capacity"
+    )
+    capacity_logic = models.JSONField(
+        help_text="Effect of this capacity", blank=True, default=dict
+    )
+    enabled = models.BooleanField(
+        help_text="Enables spawning and show in completion", default=True
+    )
+    short_name = models.CharField(
+        max_length=24,
+        blank=True,
+        null=True,
+        help_text="An alternative shorter name used only when generating the card, "
+        "if the base name is too long.",
+    )
+    catch_names = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Additional possible names for catching this ball, separated by semicolons",
+    )
+    tradeable = models.BooleanField(
+        help_text="Whether this ball can be traded with others", default=True
+    )
+    economy = models.ForeignKey(
+        Economy,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        help_text="Economical regime of this country",
+    )
+    economy_id: int | None
+    regime = models.ForeignKey(
+        Regime, on_delete=models.CASCADE, help_text="Political regime of this country"
+    )
+    regime_id: int
+    created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, editable=False)
     translations = models.TextField(blank=True, null=True)
-    wild_card = models.CharField(max_length=200, blank=True)
-    collection_card = models.CharField(max_length=200, blank=True)
-    credits = models.CharField(max_length=64, blank=True)
-    capacity_name = models.CharField(max_length=64, blank=True)
-    capacity_description = models.CharField(max_length=256, blank=True)
-    capacity_logic = models.JSONField(default=dict, blank=True)
-    attack = models.IntegerField(default=0)
-    health = models.IntegerField(default=0)
-    enabled = models.BooleanField(default=True)
-    tradeable = models.BooleanField(default=True)
-    created_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
-        return f"{self.country}"
+        return self.country
+
+    @admin.display(description="Current collection card")
+    def collection_image(self) -> SafeText:
+        return image_display(str(self.collection_card))
+
+    @admin.display(description="Current spawn asset")
+    def spawn_image(self) -> SafeText:
+        return image_display(str(self.wild_card))
+
+    def save(
+        self,
+        force_insert: bool = False,
+        force_update: bool = False,
+        using: str | None = None,
+        update_fields: Iterable[str] | None = None,
+    ) -> None:
+
+        def lower_catch_names(names: str | None) -> str | None:
+            if names:
+                return ";".join([x.strip() for x in names.split(";")]).lower()
+
+        self.catch_names = lower_catch_names(self.catch_names)
+        self.translations = lower_catch_names(self.translations)
+
+        return super().save(force_insert, force_update, using, update_fields)
 
     class Meta:
         managed = True
         db_table = "ball"
-        verbose_name = "NBA"
-        verbose_name_plural = "NBAs"
+        verbose_name = settings.collectible_name
+        verbose_name_plural = settings.plural_collectible_name
 
 
 class BallInstance(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    ball = models.ForeignKey(Ball, on_delete=models.CASCADE)
-    player = models.ForeignKey(Player, on_delete=models.CASCADE)
-    server_id = models.BigIntegerField()
     catch_date = models.DateTimeField()
-    spawned_time = models.DateTimeField(null=True, blank=True)
-    health_bonus = models.IntegerField(default=0)
-    attack_bonus = models.IntegerField(default=0)
-    favorite = models.BooleanField(default=False)
-    tradeable = models.BooleanField(default=True)
-    locked = models.DateTimeField(null=True, blank=True)
-    extra_data = models.JSONField(default=dict, blank=True)
-    deleted = models.BooleanField(default=False)
-    special = models.ForeignKey(Special, on_delete=models.SET_NULL, null=True, blank=True)
-    trade_player = models.ForeignKey(Player, on_delete=models.SET_NULL, null=True, blank=True, related_name="traded_cards")
-
-    @admin.display(description="Description")
-    def description(self) -> str:
-        return f"#{self.id} {self.ball.country}"
-
-    @admin.display(description="Catch Time")
-    def catch_time(self) -> str:
-        return format_dt(self.catch_date, "R") if self.catch_date else "Unknown"
+    health_bonus = models.IntegerField()
+    attack_bonus = models.IntegerField()
+    ball = models.ForeignKey(Ball, on_delete=models.CASCADE)
+    ball_id: int
+    player = models.ForeignKey(Player, on_delete=models.CASCADE)
+    player_id: int
+    trade_player = models.ForeignKey(
+        Player,
+        on_delete=models.SET_NULL,
+        related_name="ballinstance_trade_player_set",
+        blank=True,
+        null=True,
+    )
+    trade_player_id: int | None
+    favorite = models.BooleanField()
+    special = models.ForeignKey(Special, on_delete=models.SET_NULL, blank=True, null=True)
+    special_id: int | None
+    server_id = models.BigIntegerField(
+        blank=True, null=True, help_text="Discord server ID where this ball was caught"
+    )
+    tradeable = models.BooleanField()
+    extra_data = models.JSONField(blank=True, default=dict)
+    locked = models.DateTimeField(
+        blank=True, null=True, help_text="If the instance was locked for a trade and when"
+    )
+    spawned_time = models.DateTimeField(blank=True, null=True)
+    deleted = models.BooleanField(
+        default=False,
+        help_text="Whether this instance was deleted or not.",
+    )
 
     def __str__(self) -> str:
-        return f"#{self.id} - {self.ball.country}"
+        text = ""
+        if self.deleted:
+            text += "\N{NO ENTRY SIGN}"
+        if self.locked and self.locked > now() - timedelta(minutes=30):
+            text += "🔒"
+        if self.favorite:
+            text += settings.favorited_collectible_emoji
+        if text:
+            text += " "
+        if self.special:
+            text += self.special.emoji or ""
+        return f"{text}#{self.pk:0X} {self.ball.country}"
+
+    @admin.display(description="Countryball")
+    def description(self) -> SafeText:
+        text = str(self)
+        emoji = f'<img src="https://cdn.discordapp.com/emojis/{self.ball.emoji_id}.png?size=20" />'
+        return mark_safe(f"{emoji} {text} ATK:{self.attack_bonus:+d}% HP:{self.health_bonus:+d}%")
+
+    @admin.display(description="Time to catch")
+    def catch_time(self):
+        if self.spawned_time:
+            return str(self.catch_date - self.spawned_time)
+        return "-"
 
     class Meta:
         managed = True
         db_table = "ballinstance"
-        verbose_name = "NBA Card"
-        verbose_name_plural = "NBA Cards"
-
-
-class Trade(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    player1 = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="trades_initiated")
-    player2 = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="trades_received")
-    accepted = models.BooleanField(default=False)
-    datetime = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self) -> str:
-        return f"Trade #{self.id} - Player {self.player1.discord_id} <-> Player {self.player2.discord_id}"
-
-    class Meta:
-        managed = True
-        db_table = "trade"
-
-
-class TradeObject(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    trade = models.ForeignKey(Trade, on_delete=models.CASCADE)
-    ballinstance = models.ForeignKey(BallInstance, on_delete=models.CASCADE)
-    player = models.ForeignKey(Player, on_delete=models.CASCADE)
-
-    class Meta:
-        managed = True
-        db_table = "tradeobject"
+        unique_together = (("player", "id"),)
+        verbose_name = f"{settings.collectible_name} instance"
+        indexes = [models.Index(fields=("deleted",))]
 
 
 class BlacklistedID(models.Model):
     discord_id = models.BigIntegerField(unique=True, help_text="Discord user ID")
-    reason = models.CharField(max_length=256)
+    reason = models.TextField(blank=True, null=True)
+    date = models.DateTimeField(blank=True, null=True, auto_now_add=True)
     moderator_id = models.BigIntegerField(blank=True, null=True)
-
-    def __str__(self) -> str:
-        return f"ID: {self.discord_id} - {self.reason[:50]}"
 
     class Meta:
         managed = True
@@ -257,12 +345,10 @@ class BlacklistedID(models.Model):
 
 
 class BlacklistedGuild(models.Model):
-    discord_id = models.BigIntegerField(unique=True, help_text="Discord guild ID")
-    reason = models.CharField(max_length=256)
+    discord_id = models.BigIntegerField(unique=True, help_text="Discord Guild ID")
+    reason = models.TextField(blank=True, null=True)
+    date = models.DateTimeField(blank=True, null=True, auto_now_add=True)
     moderator_id = models.BigIntegerField(blank=True, null=True)
-
-    def __str__(self) -> str:
-        return f"Guild ID: {self.discord_id} - {self.reason[:50]}"
 
     class Meta:
         managed = True
@@ -270,15 +356,46 @@ class BlacklistedGuild(models.Model):
 
 
 class BlacklistHistory(models.Model):
-    discord_id = models.BigIntegerField(help_text="Discord user ID")
-    reason = models.CharField(max_length=256)
-    moderator_id = models.BigIntegerField(blank=True, null=True)
-    action_date = models.DateTimeField(auto_now_add=True)
+    discord_id = models.BigIntegerField(help_text="Discord ID")
+    moderator_id = models.BigIntegerField(help_text="Discord Moderator ID")
+    reason = models.TextField(blank=True, null=True)
+    date = models.DateTimeField(auto_now_add=True, editable=False)
+    id_type = models.CharField(max_length=64, default="user")
+    action_type = models.CharField(max_length=64, default="blacklist")
 
     class Meta:
         managed = True
         db_table = "blacklisthistory"
-        verbose_name_plural = "Blacklist histories"
+        verbose_name_plural = "blacklisthistories"
+
+
+class Trade(models.Model):
+    date = models.DateTimeField(auto_now_add=True, editable=False)
+    player1 = models.ForeignKey(Player, on_delete=models.CASCADE)
+    player1_id: int
+    player2 = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="trade_player2_set")
+    player2_id: int
+    tradeobject_set: models.QuerySet[TradeObject]
+
+    def __str__(self) -> str:
+        return f"Trade #{self.pk:0X}"
+
+    class Meta:
+        managed = True
+        db_table = "trade"
+
+
+class TradeObject(models.Model):
+    ballinstance = models.ForeignKey(BallInstance, on_delete=models.CASCADE)
+    ballinstance_id: int
+    player = models.ForeignKey(Player, on_delete=models.CASCADE)
+    player_id: int
+    trade = models.ForeignKey(Trade, on_delete=models.CASCADE)
+    trade_id: int
+
+    class Meta:
+        managed = True
+        db_table = "tradeobject"
 
 
 class Friendship(models.Model):
@@ -305,61 +422,3 @@ class Block(models.Model):
     class Meta:
         managed = True
         db_table = "block"
-
-
-class Pack(models.Model):
-    name = models.CharField(max_length=64, unique=True, help_text="Pack name (e.g., Common, Rare)")
-    cost = models.IntegerField(help_text="Coin cost to buy this pack")
-    description = models.TextField(help_text="Pack description for /packs info command")
-    enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
-
-    def __str__(self) -> str:
-        return f"{self.name} ({self.cost} coins)"
-
-    class Meta:
-        managed = True
-        db_table = "pack"
-
-
-class PackReward(models.Model):
-    pack = models.ForeignKey(Pack, on_delete=models.CASCADE)
-    coins = models.IntegerField(default=0, help_text="Coins given when pack is opened")
-    description = models.TextField(blank=True, null=True, help_text="What this pack gives (for reference)")
-
-    def __str__(self) -> str:
-        return f"{self.pack.name}: {self.coins} coins"
-
-    class Meta:
-        managed = True
-        db_table = "packreward"
-        verbose_name_plural = "Pack Rewards"
-
-
-class CoinReward(models.Model):
-    name = models.CharField(max_length=64, help_text="Config name (e.g., 'catch_reward')")
-    base_coins = models.IntegerField(default=10, help_text="Base coins awarded for catching an NBA")
-    description = models.TextField(blank=True, null=True, help_text="Description of this coin reward configuration")
-
-    def __str__(self) -> str:
-        return f"{self.name}: {self.base_coins} coins"
-
-    class Meta:
-        managed = True
-        db_table = "coinreward"
-        verbose_name = "Coin Reward Settings"
-        verbose_name_plural = "Coin Reward Settings"
-
-
-class CoinTransaction(models.Model):
-    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="transactions")
-    amount = models.BigIntegerField(help_text="Coin amount (positive for gain, negative for loss)")
-    reason = models.CharField(max_length=128, help_text="Why coins were gained/lost (e.g., 'Pack Purchase')")
-    timestamp = models.DateTimeField(auto_now_add=True, editable=False)
-
-    def __str__(self) -> str:
-        return f"{self.player}: {self.amount:+d} coins ({self.reason})"
-
-    class Meta:
-        managed = True
-        db_table = "cointransaction"
-        indexes = [models.Index(fields=("player",))]

@@ -12,14 +12,6 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 23, 2025)
 
-## Critical Schema Fixes (Session Update)
-- **Fixed Django Model Schema Mismatches** - Models now match actual PostgreSQL database
-  - Ball model: `country` (was `name`), `emoji_id` (was `emoji`), `health`/`attack` (was `hp`/`atk`)
-  - Added missing fields: `short_name`, `wild_card`, `collection_card`, `credits`, `capacity_*`, `translations`, `tradeable`, `created_at`
-  - BallInstance model: Added all missing fields (`tradeable`, `health_bonus`, `attack_bonus`, `spawned_time`, `locked`, `extra_data`, `deleted`, `trade_player`)
-  - CoinReward/PackReward models: Fixed to match exact database schema (nullable descriptions, ForeignKey vs OneToOneField)
-- **Result**: Admin panel now runs error-free on all sections
-
 ## New Features
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
   - Location: `ballsdex/packages/balls/cog.py` (lines 969-1045)
@@ -27,38 +19,11 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
   - Automatically tracked as "obtained by trade" in `/nba info`
 
-- **Economy System** (`/coins` and `/packs` commands): Full coin-based economy
-  - Location: `ballsdex/packages/economy/` (new package)
-  - Database models: `Player.coins`, `Pack`, `CoinTransaction`
-  - Admin panel models: `Pack`, `CoinTransaction` for configuration and history tracking
-  - Command groups:
-    - `/coins balance` - Check your coin balance
-    - `/coins leaderboard` - View top 10 players by coins
-    - `/packs info` - See available packs and descriptions
-    - `/packs buy <pack_name>` - Purchase a pack with coins
-    - `/packs open <pack_name>` - Open a pack (admin configured via admin panel)
-    - `/pack give <user> <amount>` - Transfer coins to another player
-  - Transaction tracking for all coin movements
-  - Configuration: All coin rewards and pack contents managed entirely through admin panel
-
-- **Individual NBA Catch Values** - Each NBA has configurable coin rewards
-  - Location: Database column `ball.catch_value` (INTEGER DEFAULT 10)
-  - Admin panel field: Ball model fieldset "Economy" > "catch_value"
-  - Implementation: Raw SQL query in `countryball.py` catch_ball method fetches catch_value per NBA
-  - Coin award logic: When player catches NBA, coins are awarded based on ball.catch_value
-  - Transaction logging: Creates CoinTransaction record with reason "Caught {NBA_name}"
-  - Location of implementation: `ballsdex/packages/countryballs/countryball.py` (lines 399-416)
-
 ## Production Deployment
 - Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
 - Collected 135 static files for production serving
 - Admin Panel: Listens on `0.0.0.0:5000`
 - Both workflows (Discord Bot + Admin Panel) running simultaneously
-
-## Database Schema Updates
-- Added `catch_value` column to `ball` table: INTEGER DEFAULT 10
-- Added `catch_value` field to Django Ball model for admin panel configuration
-- Field accessible in admin panel under Ball > Economy fieldset
 
 ## Configuration Fixes
 - Fixed CSRF issues for Replit iframe environment:
@@ -66,12 +31,6 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Allowed iframe embedding (`X_FRAME_OPTIONS = 'ALLOWALL'`)
   - Configured cookies with `SameSite='Lax'` for development environment
 - Fixed database URL SSL parameter from `sslmode` to `ssl` for asyncpg compatibility
-
-## Technical Implementation Notes
-- **Tortoise ORM Schema Handling**: catch_value column is NOT in Tortoise Ball model definition (avoided schema caching issues with asyncpg)
-- **Access Pattern**: Raw SQL queries fetch catch_value when needed in catch_ball method
-- **Admin Panel**: Django ORM models now fully match PostgreSQL schema for reliable admin interface
-- **Separation of Concerns**: Bot uses raw SQL for economy, admin panel uses Django ORM for configuration
 
 # User Preferences
 
