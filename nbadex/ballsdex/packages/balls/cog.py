@@ -1019,11 +1019,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             )
             return
 
-        await countryball.lock_for_trade()
-
         try:
             from ballsdex.packages.countryballs.countryball import BallSpawnView
             
+            # from_existing will lock the item itself
             spawn_view = await BallSpawnView.from_existing(self.bot, countryball)
             
             channel = cast(discord.TextChannel, interaction.channel)
