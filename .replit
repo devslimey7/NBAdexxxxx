@@ -9,5 +9,48 @@ packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp
 [userenv]
 
 [userenv.shared]
-BALLSDEXBOT_DB_URL = "postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+BALLSDEXBOT_DB_URL = "postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?ssl=require"
 DJANGO_SETTINGS_MODULE = "admin_panel.settings.production"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Discord Bot"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Admin Panel"
+
+[[workflows.workflow]]
+name = "Discord Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Admin Panel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && python manage.py runserver 0.0.0.0:5000"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
