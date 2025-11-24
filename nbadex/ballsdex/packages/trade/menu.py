@@ -252,15 +252,13 @@ class TradeMenu:
         raise RuntimeError(f"User with ID {user.id} cannot be found in the trade")
 
     def _generate_embed(self):
-        add_command = self.cog.add.extras.get("mention", "`/trade add`")
-        remove_command = self.cog.remove.extras.get("mention", "`/trade remove`")
         view_command = self.cog.view.extras.get("mention", "`/trade view`")
 
         self.embed.title = f"{settings.plural_collectible_name.title()} trading"
         self.embed.color = discord.Colour.blurple()
         self.embed.description = (
             f"Add or remove {settings.plural_collectible_name} you want to propose "
-            f"to the other player using the {add_command} and {remove_command} commands.\n"
+            f"to the other player using the `/trade add` and `/trade remove` commands.\n"
             "Once you're finished, click the lock button below to confirm your proposal.\n"
             "You can also lock with nothing if you're receiving a gift.\n\n"
             "*This trade will timeout "
