@@ -221,13 +221,10 @@ async def get_enabled_packs():
 
         def fetch_packs():
             return list(
-                Pack.objects.filter(enabled=True).values("id", "name", "cost", "description")
+                Pack.objects.filter(enabled=True).values("id", "name", "cost", "description", "emoji")
             )
 
         packs = await sync_to_async(fetch_packs)()
-        # Add default emoji
-        for pack in packs:
-            pack["emoji"] = "📦"
         return packs
     except Exception as e:
         print(f"Error fetching packs: {e}")
@@ -245,7 +242,7 @@ async def get_pack_by_id(pack_id: int):
                 "id": pack.id,
                 "name": pack.name,
                 "cost": pack.cost,
-                "emoji": "📦",
+                "emoji": pack.emoji,
                 "description": pack.description,
             }
 

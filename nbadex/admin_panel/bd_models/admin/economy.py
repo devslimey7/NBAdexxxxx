@@ -2,17 +2,24 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from ..models import Pack, CoinReward, CoinTransaction
+from ..models import Pack, CoinReward, CoinTransaction, PackContent
+
+
+class PackContentInline(admin.TabularInline):
+    model = PackContent
+    extra = 1
+    fields = ("ball_id", "rarity")
 
 
 @admin.register(Pack)
 class PackAdmin(admin.ModelAdmin):
-    list_display = ("name", "cost", "enabled")
+    list_display = ("emoji", "name", "cost", "enabled")
     list_filter = ("enabled",)
     search_fields = ("name",)
+    inlines = [PackContentInline]
     fieldsets = (
         ("Pack Information", {
-            "fields": ("name", "cost", "description", "enabled")
+            "fields": ("name", "emoji", "cost", "description", "enabled")
         }),
     )
 
@@ -40,3 +47,15 @@ class CoinTransactionAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+@admin.register(PackContent)
+class PackContentAdmin(admin.ModelAdmin):
+    list_display = ("pack", "ball_id", "rarity")
+    list_filter = ("pack",)
+    search_fields = ("pack__name", "ball_id")
+    fieldsets = (
+        ("Pack Content", {
+            "fields": ("pack", "ball_id", "rarity")
+        }),
+    )

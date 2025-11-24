@@ -430,10 +430,11 @@ class Pack(models.Model):
     name = models.CharField(max_length=255, help_text="Name of the pack")
     cost = models.IntegerField(default=0, help_text="Cost in coins to purchase this pack")
     description = models.TextField(default="", help_text="Description of pack contents")
+    emoji = models.CharField(max_length=20, default="📦", help_text="Emoji for this pack")
     enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
 
     def __str__(self) -> str:
-        return self.name
+        return f"{self.emoji} {self.name}"
 
     class Meta:
         managed = False
@@ -468,3 +469,19 @@ class CoinTransaction(models.Model):
     class Meta:
         managed = False
         db_table = "cointransaction"
+
+
+class PackContent(models.Model):
+    """NBAs that can be obtained from a pack with their rarity"""
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="contents")
+    pack_id: int
+    ball_id = models.IntegerField(help_text="Ball ID (NBA collectible)")
+    rarity = models.FloatField(default=1.0, help_text="Rarity/probability (0.0 to 1.0)")
+
+    def __str__(self) -> str:
+        return f"{self.pack.name} - Ball #{self.ball_id} (rarity: {self.rarity})"
+
+    class Meta:
+        managed = False
+        db_table = "pack_content"
+        unique_together = ("pack", "ball_id")
