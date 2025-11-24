@@ -438,7 +438,7 @@ class Pack(models.Model):
         return f"{self.emoji} {self.name}" if self.emoji else self.name
 
     class Meta:
-        managed = True
+        managed = False
         db_table = "pack"
 
 
@@ -456,7 +456,7 @@ class CoinReward(models.Model):
         return f"{self.pack.name} - {self.amount} coins"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = "coinreward"
 
 
@@ -476,5 +476,5 @@ class CoinTransaction(models.Model):
         return f"{self.player.discord_id}: {self.amount} ({self.reason})"
 
     class Meta:
-        managed = True
+        managed = False
         db_table = "cointransaction"
