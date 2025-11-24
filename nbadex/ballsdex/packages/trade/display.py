@@ -88,6 +88,17 @@ def _build_list_of_strings(
             proposal.append("")
         proposal[i] += text
 
+    # Add coins to the proposal if any
+    if trader.coins > 0:
+        coins_text = f"\n💰 **{trader.coins:,}** coins"
+        if len(coins_text) + len(proposal[i]) > 950:
+            i += 1
+            proposal.append(coins_text)
+        else:
+            proposal[i] += coins_text
+    elif not proposal[0]:
+        proposal[0] = "*Empty*"
+
     if not proposal[0]:
         proposal[0] = "*Empty*"
 

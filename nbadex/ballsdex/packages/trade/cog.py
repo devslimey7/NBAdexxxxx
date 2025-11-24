@@ -545,6 +545,14 @@ class Trade(commands.GroupCog):
                 )
                 return
 
+            # Check if player has enough coins
+            if trader.player.coins < amount:
+                await interaction.followup.send(
+                    f"You don't have enough coins! You have **{trader.player.coins:,}** coins but tried to add **{amount:,}**.",
+                    ephemeral=True,
+                )
+                return
+
             # Add coins to trader's proposal
             trader.coins += amount
 
