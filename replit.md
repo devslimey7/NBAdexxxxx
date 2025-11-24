@@ -10,27 +10,31 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
 
-# Recent Changes (Session: Nov 23, 2025)
+# Recent Changes (Session: Nov 24, 2025)
 
 ## New Features
-- **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
-  - Location: `ballsdex/packages/balls/cog.py` (lines 969-1045)
-  - Features: Tradeable check, favorite confirmation, locked item handling
-  - Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
-  - Automatically tracked as "obtained by trade" in `/nba info`
+- **Coin Economy System**: Full coin earning and trading system
+  - `player.coins` field: BigIntField tracking player's total coins (default: 0)
+  - `ball.coin_reward` field: IntField controlling coins awarded per ball (admin-editable, default: 0)
+  - Coins awarded automatically when player catches/claims NBA
+  - Display in claim message: "+X coins 👑" when coin_reward > 0
+  - Location: `ballsdex/core/models.py` (Player line 475, Ball line 189)
 
-## Production Deployment
-- Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
-- Collected 135 static files for production serving
-- Admin Panel: Listens on `0.0.0.0:5000`
-- Both workflows (Discord Bot + Admin Panel) running simultaneously
+- **Coin Commands**:
+  - `/nba coins`: View your total coin balance (private response, gold embed)
+  - `/nba give @user amount`: Transfer coins to another player (error handling for insufficient funds)
+  - `/nba coins leaderboard`: Display top 10 players by coins with medals (🥇🥈🥉), gold color theme, professional design
+  - Location: `ballsdex/packages/balls/cog.py` (lines 1255-1395)
 
-## Configuration Fixes
-- Fixed CSRF issues for Replit iframe environment:
-  - Enabled session-based CSRF tokens (`CSRF_USE_SESSIONS = True`)
-  - Allowed iframe embedding (`X_FRAME_OPTIONS = 'ALLOWALL'`)
-  - Configured cookies with `SameSite='Lax'` for development environment
-- Fixed database URL SSL parameter from `sslmode` to `ssl` for asyncpg compatibility
+- **Admin Panel Integration**:
+  - Added `coin_reward` field to Ball admin list display
+  - Added `coin_reward` field to Ball admin fieldsets for easy editing
+  - Location: `admin_panel/bd_models/admin/ball.py`
+
+## Previous Changes (Session: Nov 23, 2025)
+- Drop Command (`/nba drop`): Users can drop NBAs from inventory for others to catch
+- Production deployment with Gunicorn 23.0.0 and 4 workers
+- Django OAuth2 authentication with CSRF and frame options configured
 
 # User Preferences
 
