@@ -393,13 +393,6 @@ class BallSpawnView(View):
             spawned_time=self.message.created_at,
         )
 
-        # Award coins for catching
-        try:
-            from ballsdex.packages.balls.packs_cog import award_coins_from_reward
-            await award_coins_from_reward(user.id, "catch_reward", self.model.country)
-        except Exception as e:
-            log.warning(f"Error awarding catch coins: {e}")
-        
         # logging and stats
         log.log(
             logging.INFO if user.id in self.bot.catch_log else logging.DEBUG,

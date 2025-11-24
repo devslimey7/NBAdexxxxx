@@ -13,7 +13,10 @@ from tortoise.functions import Count
 from ballsdex.core.models import (
     Ball,
     BallInstance,
+    CoinReward,
+    CoinTransaction,
     DonationPolicy,
+    Pack,
     Player,
     Special,
     Trade,
@@ -1244,5 +1247,164 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             log.error(f"Error in claim command: {e}")
             await interaction.followup.send(
                 "An error occurred while claiming your daily reward.",
+                ephemeral=True,
+            )
+
+    @app_commands.command()
+    async def balance(self, interaction: discord.Interaction["BallsDexBot"]):
+        """Check your coin balance"""
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            embed = discord.Embed(
+                title="💰 Your Balance",
+                description=f"**{player.coins:,}** coins",
+                color=discord.Color.gold(),
+            )
+            embed.set_footer(text=f"User ID: {interaction.user.id}")
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            log.error(f"Error in balance command: {e}")
+            await interaction.followup.send(
+                "An error occurred while checking your balance.",
+                ephemeral=True,
+            )
+
+    class PackView(View):
+        def __init__(self, cog: "Balls", interaction: discord.Interaction["BallsDexBot"]):
+            super().__init__(timeout=300)
+            self.cog = cog
+            self.interaction = interaction
+            self.player = None
+            self.packs = None
+
+        async def on_timeout(self):
+            for item in self.children:
+                item.disabled = True
+            try:
+                await self.interaction.edit_original_response(view=self)
+            except discord.NotFound:
+                pass
+
+        async def interaction_check(self, interaction: discord.Interaction["BallsDexBot"], /) -> bool:
+            if interaction.user.id != self.interaction.user.id:
+                await interaction.response.send_message(
+                    "You are not allowed to interact with this menu.", ephemeral=True
+                )
+                return False
+            return True
+
+        async def load_packs(self):
+            self.packs = await Pack.filter(enabled=True).all()
+
+        @button(label="Select Pack", style=discord.ButtonStyle.primary)
+        async def select_pack(self, interaction: discord.Interaction["BallsDexBot"], button: Button):
+            if not self.packs:
+                await interaction.response.send_message("No packs available.", ephemeral=True)
+                return
+
+            # Create select menu
+            class PackSelect(discord.ui.Select):
+                def __init__(self, parent_view: "Balls.PackView"):
+                    options = [
+                        discord.SelectOption(
+                            label=f"{pack.name} ({pack.cost} coins)",
+                            value=str(pack.id),
+                            emoji=pack.emoji or "📦",
+                            description=pack.description[:100] if pack.description else "",
+                        )
+                        for pack in parent_view.packs
+                    ]
+                    super().__init__(
+                        placeholder="Choose a pack to buy...",
+                        options=options,
+                        min_values=1,
+                        max_values=1,
+                    )
+                    self.parent_view = parent_view
+
+                async def callback(self, interaction: discord.Interaction["BallsDexBot"]):
+                    pack_id = int(self.values[0])
+                    pack = await Pack.get_or_none(id=pack_id, enabled=True)
+                    if not pack:
+                        await interaction.response.send_message("Pack not found.", ephemeral=True)
+                        return
+
+                    player = await Player.get(discord_id=interaction.user.id)
+                    if player.coins < pack.cost:
+                        await interaction.response.send_message(
+                            f"❌ You don't have enough coins! You need **{pack.cost}** coins but only have **{player.coins}**.",
+                            ephemeral=True,
+                        )
+                        return
+
+                    # Deduct coins
+                    player.coins -= pack.cost
+                    await player.save()
+
+                    # Record transaction
+                    await CoinTransaction.create(
+                        player=player,
+                        amount=-pack.cost,
+                        reason=f"Purchased {pack.name}",
+                        pack=pack,
+                    )
+
+                    # Get rewards
+                    rewards = await pack.rewards.all()
+                    total_coins = sum(r.amount for r in rewards)
+
+                    # Add coins back
+                    player.coins += total_coins
+                    await player.save()
+
+                    await CoinTransaction.create(
+                        player=player,
+                        amount=total_coins,
+                        reason=f"Reward from {pack.name}",
+                        pack=pack,
+                    )
+
+                    embed = discord.Embed(
+                        title=f"✅ {pack.emoji} {pack.name} Opened!",
+                        description=f"You received **{total_coins:,}** coins!\n\nYour new balance: **{player.coins:,}** coins",
+                        color=discord.Color.green(),
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            select = PackSelect(self)
+            view = View()
+            view.add_item(select)
+            await interaction.response.send_message("Choose a pack:", view=view, ephemeral=True)
+
+    @app_commands.command()
+    async def pack(self, interaction: discord.Interaction["BallsDexBot"]):
+        """Open the pack shop"""
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            pack_view = self.PackView(self, interaction)
+            await pack_view.load_packs()
+
+            if not pack_view.packs:
+                await interaction.followup.send("No packs available for purchase.", ephemeral=True)
+                return
+
+            embed = discord.Embed(
+                title="📦 Pack Shop",
+                description=f"You have **{player.coins:,}** coins.\n\nClick the button below to select a pack.",
+                color=discord.Color.blue(),
+            )
+
+            await interaction.followup.send(embed=embed, view=pack_view, ephemeral=True)
+        except Exception as e:
+            log.error(f"Error in pack command: {e}")
+            await interaction.followup.send(
+                "An error occurred while opening the pack shop.",
                 ephemeral=True,
             )

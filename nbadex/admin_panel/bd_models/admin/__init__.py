@@ -1,6 +1,5 @@
 from .ball import BallAdmin, EconomyAdmin, RegimeAdmin
 from .ball_instance import BallInstanceAdmin
-from .economy import PackAdmin, CoinTransactionAdmin
 from .guild import GuildAdmin
 from .player import PlayerAdmin
 from .special import SpecialAdmin
@@ -11,8 +10,6 @@ __all__ = [
     "EconomyAdmin",
     "RegimeAdmin",
     "BallInstanceAdmin",
-    "PackAdmin",
-    "CoinTransactionAdmin",
     "GuildAdmin",
     "PlayerAdmin",
     "SpecialAdmin",

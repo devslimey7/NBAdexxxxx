@@ -87,7 +87,6 @@ class Player(models.Model):
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
     extra_data = models.JSONField(blank=True, default=dict)
-    coins = models.BigIntegerField(default=0, help_text="Player's coin balance")
 
     def is_blacklisted(self) -> bool:
         blacklist = cast(
@@ -427,31 +426,37 @@ class Block(models.Model):
 
 class Pack(models.Model):
     """Pack that players can purchase with coins"""
-    name = models.CharField(max_length=255, help_text="Name of the pack")
-    cost = models.IntegerField(default=0, help_text="Cost in coins to purchase this pack")
-    description = models.TextField(default="", help_text="Description of pack contents")
-    emoji = models.CharField(max_length=20, default="📦", help_text="Emoji for this pack")
+    name = models.CharField(max_length=64, help_text="Name of the pack")
+    emoji = models.CharField(max_length=20, blank=True, null=True, help_text="Emoji for the pack")
+    cost = models.IntegerField(help_text="Cost in coins to purchase this pack")
+    description = models.TextField(blank=True, default="", help_text="Description of pack contents")
     enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
-        return f"{self.emoji} {self.name}"
+        return f"{self.emoji} {self.name}" if self.emoji else self.name
 
     class Meta:
-        managed = False
+        managed = True
         db_table = "pack"
 
 
 class CoinReward(models.Model):
-    """Base coin reward configuration"""
-    name = models.CharField(max_length=64, unique=True, help_text="Name of the reward")
-    base_coins = models.IntegerField(default=10, help_text="Base amount of coins")
-    description = models.TextField(default="", help_text="Description of this reward")
+    """Rewards that come from opening a pack"""
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="rewards")
+    pack_id: int
+    amount = models.IntegerField(help_text="Amount of coins rewarded")
+    probability = models.FloatField(default=1.0, help_text="Probability of getting this reward (0-1)")
+    description = models.CharField(
+        max_length=128, blank=True, null=True, help_text="Description of this reward"
+    )
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.base_coins} coins)"
+        return f"{self.pack.name} - {self.amount} coins"
 
     class Meta:
-        managed = False
+        managed = True
         db_table = "coinreward"
 
 
@@ -459,46 +464,17 @@ class CoinTransaction(models.Model):
     """Record of all coin transactions"""
     player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="coin_transactions")
     player_id: int
-    amount = models.BigIntegerField(help_text="Amount of coins (positive for gain, negative for loss)")
+    amount = models.IntegerField(help_text="Amount of coins (positive for gain, negative for loss)")
     reason = models.CharField(max_length=128, help_text="Reason for transaction")
-    timestamp = models.DateTimeField(auto_now_add=True, editable=False)
+    pack = models.ForeignKey(
+        Pack, on_delete=models.SET_NULL, blank=True, null=True, related_name="transactions"
+    )
+    pack_id: int | None
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
     def __str__(self) -> str:
         return f"{self.player.discord_id}: {self.amount} ({self.reason})"
 
     class Meta:
-        managed = False
+        managed = True
         db_table = "cointransaction"
-
-
-class PlayerPack(models.Model):
-    """Track packs owned by players"""
-    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="owned_packs")
-    player_id: int
-    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="owners")
-    pack_id: int
-
-    def __str__(self) -> str:
-        return f"{self.player.discord_id} owns {self.pack.name}"
-
-    class Meta:
-        managed = False
-        db_table = "player_pack"
-
-
-class PackContent(models.Model):
-    """NBAs that can be obtained from a pack with their rarity"""
-    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="contents")
-    pack_id: int
-    ball_id = models.IntegerField(help_text="Ball ID (NBA collectible)")
-    rarity = models.FloatField(default=1.0, help_text="Rarity/probability (0.0 to 1.0)")
-
-    def __str__(self) -> str:
-        return f"{self.pack.name} - Ball #{self.ball_id} (rarity: {self.rarity})"
-
-    class Meta:
-        managed = False
-        db_table = "pack_content"
-        unique_together = ("pack", "ball_id")
-
-

@@ -96,7 +96,6 @@ class Trade(commands.GroupCog):
         return result
 
     bulk = app_commands.Group(name="bulk", description="Bulk Commands")
-    nba = app_commands.Group(name="nba", description="Add or remove NBA collectibles in trades")
 
     def get_trade(
         self,
@@ -226,8 +225,8 @@ class Trade(commands.GroupCog):
         await menu.start()
         await interaction.response.send_message("Trade started!", ephemeral=True)
 
-    @nba.command(name="add", description="Add an NBA collectible to your trade")
-    async def nba_add(
+    @app_commands.command(extras={"trade": TradeCommandType.PICK})
+    async def add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         countryball: BallInstanceTransform,
@@ -298,7 +297,7 @@ class Trade(commands.GroupCog):
             f"{countryball.countryball.country} added.", ephemeral=True
         )
 
-    @bulk.command(name="add")
+    @bulk.command(name="add", extras={"trade": TradeCommandType.PICK})
     async def bulk_add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
@@ -358,8 +357,8 @@ class Trade(commands.GroupCog):
             f"the selected {settings.plural_collectible_name} will remain."
         )
 
-    @nba.command(name="remove", description="Remove an NBA collectible from your trade")
-    async def nba_remove(
+    @app_commands.command(extras={"trade": TradeCommandType.REMOVE})
+    async def remove(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         countryball: BallInstanceTransform,
@@ -516,96 +515,3 @@ class Trade(commands.GroupCog):
 
         source = TradeViewMenu(interaction, [trade.trader1, trade.trader2], self)
         await source.start(content="Select a user to view their proposal.")
-
-    # ===== COINS SUBGROUP =====
-    coins = app_commands.Group(name="coins", description="Add or remove coins in a trade")
-
-    @coins.command(name="add", description="Add coins to your trade proposal")
-    @app_commands.describe(amount="Amount of coins to add")
-    async def coins_add(
-        self,
-        interaction: discord.Interaction["BallsDexBot"],
-        amount: int,
-    ):
-        """Add coins to an ongoing trade."""
-        await interaction.response.defer(ephemeral=True)
-        try:
-            if amount <= 0:
-                await interaction.followup.send("Amount must be positive!", ephemeral=True)
-                return
-
-            trade, trader = self.get_trade(interaction)
-            if not trade or not trader:
-                await interaction.followup.send("You do not have an ongoing trade.", ephemeral=True)
-                return
-
-            if trader.locked:
-                await interaction.followup.send(
-                    "You have locked your proposal, it cannot be edited!",
-                    ephemeral=True,
-                )
-                return
-
-            # Check if player has enough coins
-            if trader.player.coins < amount:
-                await interaction.followup.send(
-                    f"You don't have enough coins! You have **{trader.player.coins:,}** coins but tried to add **{amount:,}**.",
-                    ephemeral=True,
-                )
-                return
-
-            # Add coins to trader's proposal
-            trader.coins += amount
-
-            embed = discord.Embed(
-                title="✅ Coins Added",
-                description=f"Added **{amount:,}** coins to your trade proposal",
-                color=discord.Color.green(),
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"Error: {e}", ephemeral=True)
-
-    @coins.command(name="remove", description="Remove coins from your trade proposal")
-    @app_commands.describe(amount="Amount of coins to remove")
-    async def coins_remove(
-        self,
-        interaction: discord.Interaction["BallsDexBot"],
-        amount: int,
-    ):
-        """Remove coins from an ongoing trade."""
-        await interaction.response.defer(ephemeral=True)
-        try:
-            if amount <= 0:
-                await interaction.followup.send("Amount must be positive!", ephemeral=True)
-                return
-
-            trade, trader = self.get_trade(interaction)
-            if not trade or not trader:
-                await interaction.followup.send("You do not have an ongoing trade.", ephemeral=True)
-                return
-
-            if trader.locked:
-                await interaction.followup.send(
-                    "You have locked your proposal, it cannot be edited!",
-                    ephemeral=True,
-                )
-                return
-
-            if trader.coins < amount:
-                await interaction.followup.send(
-                    f"You only have {trader.coins:,} coins in this trade!",
-                    ephemeral=True,
-                )
-                return
-
-            trader.coins -= amount
-
-            embed = discord.Embed(
-                title="✅ Coins Removed",
-                description=f"Removed **{amount:,}** coins from your trade proposal",
-                color=discord.Color.green(),
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"Error: {e}", ephemeral=True)

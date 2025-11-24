@@ -12,45 +12,25 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 24, 2025)
 
-## Economy System Redesign - Professional & Fully Customizable ✅ COMPLETE
-- **Database Models** (Professional architecture):
-  - `EconomyConfig`: Global singleton configuration for all coin rewards (managed through admin panel)
-  - `Pack`: Purchasable packs with cost, description, enabled status (fully customizable)
-  - `PackContent`: Defines which NBAs can drop from each pack with rarity weights
-  - `CoinReward`: Optional one-off/special rewards (for custom use cases)
-  - `CoinTransaction`: Complete audit log of all coin movements (player, amount, reason, timestamp)
-  - `Player.coins`: Coin balance for each player
-  - `PlayerPack`: Tracks pack ownership for each player
-- **Economy Configuration (Admin Panel)** ✅ Fully Customizable:
-  - Starting coins for new players
-  - Coins awarded per NBA catch
-  - Coins awarded per pack open
-  - Trade fee percentage (0.0-1.0)
-  - Everything configurable with NO hardcoding - just edit in admin panel
-- **Pack System** ✅ Professional:
-  - `/packs list [sorting] [reverse]` - List all packs, sortable by name/cost
-  - `/packs buy pack: [amount]` - Buy packs with autocomplete (NO pagination)
-  - `/packs inventory` - View your owned packs
-  - `/packs give user: pack: [amount]` - Give packs to other players (autocomplete)
-  - `/packs open pack: [ephemeral]` - Open packs and get random NBA with coins
-  - Autocomplete-based pack selection throughout
-- **Coin Commands** ✅ Complete:
-  - `/coins balance` - Check your coin balance
-  - `/coins leaderboard` - View top 10 coin holders
-  - `/trade coins add` - Add coins to trade proposal (with validation)
-  - `/trade coins remove` - Remove coins from trade proposal
-- **NBA Trading** ✅ Integrated:
-  - `/trade nba add` - Add NBA collectibles to ongoing trade
-  - `/trade nba remove` - Remove NBA collectibles from ongoing trade
-  - `/trade begin/cancel/view/history` - Full trading system
-  - Coins and NBAs fully integrated in trades
-- **Professional Implementation**:
-  - All queries use Django ORM (type-safe, no raw SQL issues)
-  - Proper async/await patterns with sync_to_async
-  - Complete transaction logging for all coin movements
-  - Coin rewards configurable per NBA type, pack type, etc.
-  - No hardcoded magic strings - everything via EconomyConfig
-  - Admin panel fully functional with clean UI for economy management
+## Economy System Implementation
+- **New Models** (Tortoise ORM & Django):
+  - `Pack`: Purchasable packs with cost in coins, emoji, and description
+  - `CoinReward`: Individual rewards tied to packs with probability weighting
+  - `CoinTransaction`: Complete transaction history for auditing
+- **New Discord Commands**:
+  - `/nba balance`: Display player's coin balance
+  - `/nba pack`: Open pack shop with selectable purchases (like drop command)
+    - Shows available packs with cost and descriptions
+    - Deducts coins, processes rewards, records transactions
+- **Admin Panel Integration**:
+  - Pack management: Create, edit, enable/disable packs
+  - CoinReward inline editing for pack rewards
+  - CoinTransaction history (read-only, admin view only)
+- **Economy Features**:
+  - Player coins auto-tracked in `Player.coins` field
+  - All transactions recorded in `CoinTransaction` for audit trail
+  - Selectable pack purchases with visual feedback
+  - Coin economy starts empty - all values configured through admin panel
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
@@ -98,11 +78,9 @@ Deployment: Production-grade server (Gunicorn), not development server.
 **Key cogs**:
 - `CountryBallsSpawner`: Handles spawning collectibles in channels based on message activity
 - `Balls`: Player inventory management, info commands, donations
-- `EconomyCommands`: Coin balance and leaderboard commands
-- `PacksCommands`: Pack shop with autocomplete-based selection
 - `Admin`: Administrative commands for bot owners/staff
 - `Config`: Server configuration and setup
-- `Trade`: Trading system between players, coin transfers
+- `Trade`: Trading system between players
 
 ### Spawn System
 
