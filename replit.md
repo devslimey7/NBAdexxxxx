@@ -12,8 +12,29 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 24, 2025)
 
-- Removed economy system (coins, packs, CoinReward, CoinTransaction) - not needed
-- Bot and admin panel running smoothly with all core features
+## Pack System Implementation (Complete)
+- **New Models** (Tortoise ORM & Django):
+  - `Pack`: Purchasable pack with name, emoji, description, and price (in points)
+  - `PlayerPack`: Player's owned packs with count tracking
+  - `Player.points`: Player's points balance (currency for pack purchases)
+- **Discord Commands** (`/packs` group):
+  - `/packs list [sorting]`: Show all available packs with descriptions, prices, and ownership count
+    - Sorting options: alphabetical, price, created_at
+  - `/packs buy <pack> [amount]`: Purchase packs with points, adds to inventory
+  - `/packs inventory`: Show all owned packs with counts
+  - `/packs open <pack>`: Open/use a pack from your inventory
+  - `/packs give <user> <pack> [amount]`: Transfer packs to other users
+- **Admin Commands** (`/admin packs` group):
+  - `/admin packs add <user> <pack> [amount]`: Add packs to user's inventory
+  - `/admin packs remove <user> <pack> [amount]`: Remove packs from user's inventory
+- **Admin Panel**:
+  - Pack management: Create, edit, view all packs with price and description
+  - PlayerPack management: View and modify player pack inventories
+- **Economy Features**:
+  - Points-based currency system (separate from collection mechanics)
+  - All packs start empty - admins create them in admin panel
+  - Players earn points (admins control via database)
+  - Complete pack ownership tracking with per-user counts
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch

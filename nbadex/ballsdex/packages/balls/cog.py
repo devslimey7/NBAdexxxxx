@@ -14,7 +14,9 @@ from ballsdex.core.models import (
     Ball,
     BallInstance,
     DonationPolicy,
+    Pack,
     Player,
+    PlayerPack,
     Special,
     Trade,
     TradeObject,
@@ -1246,3 +1248,223 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 "An error occurred while claiming your daily reward.",
                 ephemeral=True,
             )
+
+    packs = app_commands.Group(name="packs", description="Pack management commands")
+
+    @packs.command(name="list")
+    @app_commands.describe(sorting="Sorting method: alphabetical, price, or created_at")
+    async def packs_list(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        sorting: str | None = None,
+    ):
+        """View all available packs"""
+        await interaction.response.defer()
+        
+        try:
+            packs = await Pack.all()
+            if not packs:
+                await interaction.followup.send("No packs available.")
+                return
+
+            # Sort packs
+            if sorting == "alphabetical":
+                packs = sorted(packs, key=lambda p: p.name)
+            elif sorting == "price":
+                packs = sorted(packs, key=lambda p: p.price)
+            elif sorting == "created_at":
+                packs = sorted(packs, key=lambda p: p.created_at)
+
+            # Get player's pack ownership
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            player_packs = await PlayerPack.filter(player=player).all()
+            ownership = {pp.pack_id: pp.count for pp in player_packs}
+
+            embed = discord.Embed(title="Pack Shop", color=discord.Color.blue())
+            for i, pack in enumerate(packs, 1):
+                owned = ownership.get(pack.id, 0)
+                emoji = pack.emoji or "📦"
+                embed.add_field(
+                    name=f"{i}. {emoji} {pack.name}",
+                    value=f"{pack.description}\nPrice: {pack.price} 💰 (You own {owned})",
+                    inline=False,
+                )
+            
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            log.error(f"Error in packs list: {e}")
+            await interaction.followup.send("Error listing packs.", ephemeral=True)
+
+    @packs.command(name="buy")
+    @app_commands.describe(pack="Pack to buy", amount="How many to buy (default 1)")
+    async def packs_buy(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        pack: str,
+        amount: int = 1,
+    ):
+        """Buy a pack"""
+        await interaction.response.defer()
+
+        try:
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            # Find pack
+            pack_obj = await Pack.filter(name__icontains=pack).first()
+            if not pack_obj:
+                await interaction.followup.send("Pack not found.", ephemeral=True)
+                return
+
+            total_cost = pack_obj.price * amount
+            if player.points < total_cost:
+                await interaction.followup.send(
+                    f"❌ You don't have enough points! You need **{total_cost}** but have **{player.points}**.",
+                    ephemeral=True,
+                )
+                return
+
+            # Deduct points and add pack
+            player.points -= total_cost
+            await player.save()
+
+            player_pack, created = await PlayerPack.get_or_create(
+                player=player, pack=pack_obj
+            )
+            if not created:
+                player_pack.count += amount
+                await player_pack.save()
+            else:
+                player_pack.count = amount
+                await player_pack.save()
+
+            emoji = pack_obj.emoji or "📦"
+            await interaction.followup.send(
+                f"✅ Successfully bought {amount}x {emoji} **{pack_obj.name}**!\n"
+                f"You spent **{total_cost}** points. New balance: **{player.points}**"
+            )
+        except Exception as e:
+            log.error(f"Error in packs buy: {e}")
+            await interaction.followup.send("Error buying pack.", ephemeral=True)
+
+    @packs.command(name="inventory")
+    async def packs_inventory(self, interaction: discord.Interaction["BallsDexBot"]):
+        """View your owned packs"""
+        await interaction.response.defer()
+
+        try:
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            player_packs = await PlayerPack.filter(player=player).prefetch_related("pack").all()
+
+            if not player_packs:
+                await interaction.followup.send("You don't own any packs.")
+                return
+
+            embed = discord.Embed(title="Your Pack Inventory", color=discord.Color.green())
+            for pp in player_packs:
+                emoji = pp.pack.emoji or "📦"
+                embed.add_field(
+                    name=f"{emoji} {pp.pack.name}",
+                    value=f"**{pp.count}** owned",
+                    inline=True,
+                )
+
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            log.error(f"Error in packs inventory: {e}")
+            await interaction.followup.send("Error viewing inventory.", ephemeral=True)
+
+    @packs.command(name="open")
+    @app_commands.describe(pack="Pack to open")
+    async def packs_open(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        pack: str,
+    ):
+        """Open a pack you own"""
+        await interaction.response.defer()
+
+        try:
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            # Find pack
+            pack_obj = await Pack.filter(name__icontains=pack).first()
+            if not pack_obj:
+                await interaction.followup.send("Pack not found.", ephemeral=True)
+                return
+
+            # Check ownership
+            player_pack = await PlayerPack.filter(player=player, pack=pack_obj).first()
+            if not player_pack or player_pack.count < 1:
+                await interaction.followup.send(
+                    f"❌ You don't own this pack!", ephemeral=True
+                )
+                return
+
+            # Deduct pack
+            player_pack.count -= 1
+            if player_pack.count == 0:
+                await player_pack.delete()
+            else:
+                await player_pack.save()
+
+            emoji = pack_obj.emoji or "📦"
+            await interaction.followup.send(
+                f"🎉 **Opened {emoji} {pack_obj.name}**!\n"
+                f"Check the pack description for what you can get!"
+            )
+        except Exception as e:
+            log.error(f"Error in packs open: {e}")
+            await interaction.followup.send("Error opening pack.", ephemeral=True)
+
+    @packs.command(name="give")
+    @app_commands.describe(user="User to give pack to", pack="Pack to give", amount="Amount (default 1)")
+    async def packs_give(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        user: discord.User,
+        pack: str,
+        amount: int = 1,
+    ):
+        """Give pack to another user"""
+        await interaction.response.defer()
+
+        try:
+            from_player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            to_player, _ = await Player.get_or_create(discord_id=user.id)
+
+            # Find pack
+            pack_obj = await Pack.filter(name__icontains=pack).first()
+            if not pack_obj:
+                await interaction.followup.send("Pack not found.", ephemeral=True)
+                return
+
+            # Check ownership
+            from_pack = await PlayerPack.filter(player=from_player, pack=pack_obj).first()
+            if not from_pack or from_pack.count < amount:
+                await interaction.followup.send(
+                    f"❌ You don't have {amount}x of this pack!",
+                    ephemeral=True,
+                )
+                return
+
+            # Transfer packs
+            from_pack.count -= amount
+            if from_pack.count == 0:
+                await from_pack.delete()
+            else:
+                await from_pack.save()
+
+            to_pack, created = await PlayerPack.get_or_create(
+                player=to_player, pack=pack_obj
+            )
+            if not created:
+                to_pack.count += amount
+                await to_pack.save()
+
+            emoji = pack_obj.emoji or "📦"
+            await interaction.followup.send(
+                f"✅ Gave {amount}x {emoji} **{pack_obj.name}** to {user.mention}!"
+            )
+        except Exception as e:
+            log.error(f"Error in packs give: {e}")
+            await interaction.followup.send("Error giving pack.", ephemeral=True)
