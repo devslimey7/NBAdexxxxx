@@ -427,11 +427,12 @@ class Block(models.Model):
 
 class Pack(models.Model):
     """Purchasable pack item"""
-    name = models.CharField(max_length=64, help_text="Name of the pack")
-    emoji = models.CharField(max_length=20, blank=True, null=True, help_text="Emoji for the pack")
-    description = models.TextField(help_text="Description of pack contents")
-    price = models.IntegerField(help_text="Price in points")
-    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    name = models.CharField(max_length=255, help_text="Name of the pack")
+    description = models.TextField(help_text="Description of pack contents", default="")
+    cost = models.IntegerField(help_text="Cost in coins", default=0)
+    enabled = models.BooleanField(help_text="Whether pack is available", default=True)
+    emoji = models.CharField(max_length=20, help_text="Emoji for the pack", default="📦")
+    open_reward = models.BigIntegerField(help_text="Reward coins when opened", default=0)
 
     def __str__(self) -> str:
         return f"{self.emoji} {self.name}" if self.emoji else self.name
@@ -447,12 +448,10 @@ class PlayerPack(models.Model):
     player_id: int
     pack = models.ForeignKey(Pack, on_delete=models.CASCADE)
     pack_id: int
-    count = models.IntegerField(default=1, help_text="How many of this pack the player owns")
 
     def __str__(self) -> str:
-        return f"{self.player.discord_id} - {self.pack.name} x{self.count}"
+        return f"{self.player.discord_id} - {self.pack.name}"
 
     class Meta:
         managed = True
-        db_table = "playerpack"
-        unique_together = ("player", "pack")
+        db_table = "player_pack"
