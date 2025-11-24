@@ -1228,7 +1228,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             
             log.info("Sending response")
             
-            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*"
+            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.country}**!"
             
             await interaction.followup.send(
                 content=congrats_msg,
