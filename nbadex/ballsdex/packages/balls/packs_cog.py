@@ -255,7 +255,8 @@ async def get_enabled_packs():
         
         db = Tortoise.get_connection("default")
         result = await db.execute_query(
-            "SELECT id, name, cost, description, emoji, open_reward FROM pack WHERE enabled = true ORDER BY name"
+            "SELECT id, name, cost, description, emoji, open_reward FROM pack WHERE enabled = true ORDER BY name",
+            []
         )
         
         packs = []
@@ -268,6 +269,7 @@ async def get_enabled_packs():
                 "emoji": row[4],
                 "open_reward": row[5],
             })
+        print(f"DEBUG: Fetched {len(packs)} packs: {packs}")
         return packs
     except Exception as e:
         print(f"Error fetching packs: {e}")
@@ -283,7 +285,7 @@ async def get_pack_by_id(pack_id: int):
         
         db = Tortoise.get_connection("default")
         result = await db.execute_query(
-            "SELECT id, name, cost, description, emoji, open_reward FROM pack WHERE id = %s AND enabled = true",
+            "SELECT id, name, cost, description, emoji, open_reward FROM pack WHERE id = %s AND enabled = true ORDER BY name",
             [pack_id]
         )
         
@@ -431,7 +433,7 @@ async def get_pack_contents(pack_id: int):
         
         db = Tortoise.get_connection("default")
         result = await db.execute_query(
-            "SELECT ball_id, rarity FROM packcontent WHERE pack_id = %s",
+            "SELECT ball_id, rarity FROM pack_content WHERE pack_id = %s",
             [pack_id]
         )
         
