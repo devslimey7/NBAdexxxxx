@@ -252,8 +252,7 @@ class PacksCommands(commands.Cog):
 async def get_enabled_packs():
     """Get all enabled packs from the database"""
     try:
-        import psycopg
-        from ballsdex.core.models import Tortoise
+        from tortoise import Tortoise
         
         # Use the same connection as Tortoise ORM
         db = Tortoise.get_connection("default")
@@ -282,7 +281,7 @@ async def get_enabled_packs():
 async def get_pack_by_id(pack_id: int):
     """Get a pack by ID"""
     try:
-        from ballsdex.core.models import Tortoise
+        from tortoise import Tortoise
         
         db = Tortoise.get_connection("default")
         query = "SELECT id, name, cost, description, emoji FROM pack WHERE id = %s AND enabled = true"
@@ -308,7 +307,7 @@ async def get_pack_by_id(pack_id: int):
 async def get_user_pack_count(discord_id: int, pack_id: int):
     """Get count of packs owned by user"""
     try:
-        from ballsdex.core.models import Tortoise
+        from tortoise import Tortoise
         
         db = Tortoise.get_connection("default")
         query = """
@@ -326,7 +325,7 @@ async def get_user_pack_count(discord_id: int, pack_id: int):
 async def get_user_packs(discord_id: int):
     """Get all packs owned by user"""
     try:
-        from ballsdex.core.models import Tortoise
+        from tortoise import Tortoise
         
         db = Tortoise.get_connection("default")
         query = """
@@ -358,7 +357,7 @@ async def get_user_packs(discord_id: int):
 async def log_transaction(discord_id: int, amount: int, reason: str):
     """Log a coin transaction"""
     try:
-        from ballsdex.core.models import Tortoise
+        from tortoise import Tortoise
         
         db = Tortoise.get_connection("default")
         # First get the player ID
