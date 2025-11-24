@@ -86,6 +86,7 @@ class Player(models.Model):
     trade_cooldown_policy = models.SmallIntegerField(
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
+    coins = models.BigIntegerField(default=0, help_text="Total coins owned by this player")
     extra_data = models.JSONField(blank=True, default=dict)
 
     def is_blacklisted(self) -> bool:
@@ -230,6 +231,9 @@ class Ball(models.Model):
     regime_id: int
     created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, editable=False)
     translations = models.TextField(blank=True, null=True)
+    coin_reward = models.IntegerField(
+        default=0, help_text="Number of coins awarded when this ball is caught"
+    )
 
     def __str__(self) -> str:
         return self.country
