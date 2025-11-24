@@ -145,7 +145,6 @@ class BallAdmin(admin.ModelAdmin):
         "pk",
         "emoji",
         "rarity",
-        "coin_reward",
         "capacity_name",
         "health",
         "attack",
