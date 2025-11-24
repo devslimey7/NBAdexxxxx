@@ -13,17 +13,13 @@ class PackContentInline(admin.TabularInline):
 
 @admin.register(Pack)
 class PackAdmin(admin.ModelAdmin):
-    list_display = ("emoji", "name", "cost", "open_reward", "enabled")
+    list_display = ("emoji", "name", "cost", "enabled")
     list_filter = ("enabled",)
     search_fields = ("name",)
     inlines = [PackContentInline]
     fieldsets = (
         ("Pack Information", {
             "fields": ("name", "emoji", "cost", "description", "enabled")
-        }),
-        ("Economy - Per Pack Customization", {
-            "fields": ("open_reward",),
-            "description": "Coins awarded to player when they open this pack"
         }),
     )
 

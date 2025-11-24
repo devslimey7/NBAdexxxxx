@@ -252,29 +252,24 @@ class PacksCommands(commands.Cog):
 async def get_enabled_packs():
     """Get all enabled packs from the database"""
     try:
-        # Setup Django in bot context
-        import django
-        import os
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
-        if not django.apps.apps.ready:
-            django.setup()
+        from tortoise import Tortoise
         
-        from admin_panel.bd_models.models import Pack
+        db = Tortoise.get_connection("default")
+        result = await db.execute_query(
+            "SELECT id, name, cost, description, emoji, open_reward FROM pack WHERE enabled = true ORDER BY name"
+        )
         
-        def fetch_packs():
-            packs_list = []
-            for p in Pack.objects.filter(enabled=True).order_by("name"):
-                packs_list.append({
-                    "id": p.id,
-                    "name": p.name,
-                    "cost": p.cost,
-                    "description": p.description,
-                    "emoji": p.emoji,
-                    "open_reward": p.open_reward,
-                })
-            return packs_list
-        
-        return await sync_to_async(fetch_packs)()
+        packs = []
+        for row in result:
+            packs.append({
+                "id": row[0],
+                "name": row[1],
+                "cost": row[2],
+                "description": row[3],
+                "emoji": row[4],
+                "open_reward": row[5],
+            })
+        return packs
     except Exception as e:
         print(f"Error fetching packs: {e}")
         import traceback
@@ -285,29 +280,25 @@ async def get_enabled_packs():
 async def get_pack_by_id(pack_id: int):
     """Get a pack by ID"""
     try:
-        import django
-        import os
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
-        if not django.apps.apps.ready:
-            django.setup()
+        from tortoise import Tortoise
         
-        from admin_panel.bd_models.models import Pack
+        db = Tortoise.get_connection("default")
+        result = await db.execute_query(
+            "SELECT id, name, cost, description, emoji, open_reward FROM pack WHERE id = %s AND enabled = true",
+            [pack_id]
+        )
         
-        def fetch_pack():
-            try:
-                p = Pack.objects.get(id=pack_id, enabled=True)
-                return {
-                    "id": p.id,
-                    "name": p.name,
-                    "cost": p.cost,
-                    "description": p.description,
-                    "emoji": p.emoji,
-                    "open_reward": p.open_reward,
-                }
-            except Pack.DoesNotExist:
-                return None
-        
-        return await sync_to_async(fetch_pack)()
+        if result:
+            row = result[0]
+            return {
+                "id": row[0],
+                "name": row[1],
+                "cost": row[2],
+                "description": row[3],
+                "emoji": row[4],
+                "open_reward": row[5],
+            }
+        return None
     except Exception as e:
         print(f"Error fetching pack: {e}")
         import traceback
@@ -389,29 +380,18 @@ async def log_transaction(discord_id: int, amount: int, reason: str):
 async def award_coins_from_reward(discord_id: int, reward_type: str, context: str = "", ball_id: int = None, pack_id: int = None):
     """Award coins to player - per-item customization"""
     try:
-        import django
-        import os
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
-        if not django.apps.apps.ready:
-            django.setup()
+        from tortoise import Tortoise
         
-        from admin_panel.bd_models.models import Ball, Pack
-        
+        db = Tortoise.get_connection("default")
         coin_amount = 0
         
-        # Get per-item customized reward
+        # Get per-item customized reward from database
         if reward_type == "catch" and ball_id:
-            try:
-                ball = await sync_to_async(lambda: Ball.objects.get(id=ball_id))()
-                coin_amount = ball.catch_reward
-            except:
-                coin_amount = 0
+            result = await db.execute_query("SELECT catch_reward FROM ball WHERE id = %s", [ball_id])
+            coin_amount = result[0][0] if result else 0
         elif reward_type == "pack_open" and pack_id:
-            try:
-                pack = await sync_to_async(lambda: Pack.objects.get(id=pack_id))()
-                coin_amount = pack.open_reward
-            except:
-                coin_amount = 0
+            result = await db.execute_query("SELECT open_reward FROM pack WHERE id = %s", [pack_id])
+            coin_amount = result[0][0] if result else 0
         
         if coin_amount <= 0:
             return
