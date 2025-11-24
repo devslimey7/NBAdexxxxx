@@ -1,14 +1,12 @@
 from django.contrib import admin
 
-from ballsdex.settings import settings
 from bd_models.models import Pack, PlayerPack
 
 
-class BallsdexAdminSite(admin.AdminSite):
-    site_header = f"{settings.bot_name} administration"
-    site_title = f"{settings.bot_name} admin panel"
-    site_url = None  # type: ignore
-    final_catch_all_view = False
+class PlayerPackInline(admin.TabularInline):
+    model = PlayerPack
+    extra = 0
+    fields = ("pack", "count")
 
 
 class PackAdmin(admin.ModelAdmin):
@@ -22,12 +20,11 @@ class PackAdmin(admin.ModelAdmin):
     )
 
 
-class PlayerPackInline(admin.TabularInline):
-    model = PlayerPack
-    extra = 0
-    fields = ("pack", "count")
+class PlayerPackAdmin(admin.ModelAdmin):
+    list_display = ("player", "pack", "count")
+    search_fields = ("player__discord_id", "pack__name")
+    list_filter = ("pack",)
 
 
-# Register models
 admin.site.register(Pack, PackAdmin)
-admin.site.register(PlayerPack)
+admin.site.register(PlayerPack, PlayerPackAdmin)
