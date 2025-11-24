@@ -422,3 +422,59 @@ class Block(models.Model):
     class Meta:
         managed = True
         db_table = "block"
+
+
+class Pack(models.Model):
+    """Pack that players can purchase with coins"""
+    name = models.CharField(max_length=64, help_text="Name of the pack")
+    emoji = models.CharField(max_length=20, blank=True, null=True, help_text="Emoji for the pack")
+    cost = models.IntegerField(help_text="Cost in coins to purchase this pack")
+    description = models.TextField(blank=True, default="", help_text="Description of pack contents")
+    enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.emoji} {self.name}" if self.emoji else self.name
+
+    class Meta:
+        managed = True
+        db_table = "pack"
+
+
+class CoinReward(models.Model):
+    """Rewards that come from opening a pack"""
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="rewards")
+    pack_id: int
+    amount = models.IntegerField(help_text="Amount of coins rewarded")
+    probability = models.FloatField(default=1.0, help_text="Probability of getting this reward (0-1)")
+    description = models.CharField(
+        max_length=128, blank=True, null=True, help_text="Description of this reward"
+    )
+
+    def __str__(self) -> str:
+        return f"{self.pack.name} - {self.amount} coins"
+
+    class Meta:
+        managed = True
+        db_table = "coinreward"
+
+
+class CoinTransaction(models.Model):
+    """Record of all coin transactions"""
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="coin_transactions")
+    player_id: int
+    amount = models.IntegerField(help_text="Amount of coins (positive for gain, negative for loss)")
+    reason = models.CharField(max_length=128, help_text="Reason for transaction")
+    pack = models.ForeignKey(
+        Pack, on_delete=models.SET_NULL, blank=True, null=True, related_name="transactions"
+    )
+    pack_id: int | None
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self) -> str:
+        return f"{self.player.discord_id}: {self.amount} ({self.reason})"
+
+    class Meta:
+        managed = True
+        db_table = "cointransaction"

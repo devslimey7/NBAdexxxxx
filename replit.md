@@ -10,27 +10,32 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
 
-# Recent Changes (Session: Nov 23, 2025)
+# Recent Changes (Session: Nov 24, 2025)
 
-## New Features
+## Economy System Implementation
+- **New Models** (Tortoise ORM & Django):
+  - `Pack`: Purchasable packs with cost in coins, emoji, and description
+  - `CoinReward`: Individual rewards tied to packs with probability weighting
+  - `CoinTransaction`: Complete transaction history for auditing
+- **New Discord Commands**:
+  - `/nba balance`: Display player's coin balance
+  - `/nba pack`: Open pack shop with selectable purchases (like drop command)
+    - Shows available packs with cost and descriptions
+    - Deducts coins, processes rewards, records transactions
+- **Admin Panel Integration**:
+  - Pack management: Create, edit, enable/disable packs
+  - CoinReward inline editing for pack rewards
+  - CoinTransaction history (read-only, admin view only)
+- **Economy Features**:
+  - Player coins auto-tracked in `Player.coins` field
+  - All transactions recorded in `CoinTransaction` for audit trail
+  - Selectable pack purchases with visual feedback
+  - Coin economy starts empty - all values configured through admin panel
+
+## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
-  - Location: `ballsdex/packages/balls/cog.py` (lines 969-1045)
-  - Features: Tradeable check, favorite confirmation, locked item handling
-  - Self-catch detection with custom message: "You caught your own drop? What a cheap thing to do."
-  - Automatically tracked as "obtained by trade" in `/nba info`
-
-## Production Deployment
-- Switched from Django development server to **Gunicorn 23.0.0** with 4 workers
-- Collected 135 static files for production serving
-- Admin Panel: Listens on `0.0.0.0:5000`
-- Both workflows (Discord Bot + Admin Panel) running simultaneously
-
-## Configuration Fixes
-- Fixed CSRF issues for Replit iframe environment:
-  - Enabled session-based CSRF tokens (`CSRF_USE_SESSIONS = True`)
-  - Allowed iframe embedding (`X_FRAME_OPTIONS = 'ALLOWALL'`)
-  - Configured cookies with `SameSite='Lax'` for development environment
-- Fixed database URL SSL parameter from `sslmode` to `ssl` for asyncpg compatibility
+- Switched to Gunicorn 23.0.0 for production deployment
+- Fixed CSRF and database SSL configuration for Replit
 
 # User Preferences
 
