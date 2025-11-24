@@ -14,34 +14,40 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 ## Economy System Implementation ✅ COMPLETE
 - **Database Models** (Tortoise ORM + Django):
-  - `Pack`: Purchasable packs with cost, description, enabled status, timestamps
+  - `Pack`: Purchasable packs with cost, description, enabled status
   - `CoinReward`: Rewards tied to packs with amount and probability
   - `CoinTransaction`: Complete audit log of all coin movements (player, amount, reason, timestamp)
   - `Player.coins`: Coin balance for each player
   - `PlayerPack`: Tracks pack ownership for each player
 - **Discord Commands - Coins** (EconomyCommands cog):
-  - `/coins balance` - Check your coin balance
-  - `/coins leaderboard` - View top 10 coin holders
+  - ✅ `/coins balance` - Check your coin balance
+  - ✅ `/coins leaderboard` - View top 10 coin holders
 - **Discord Commands - Trade Coins** (Trade cog):
-  - `/trade coins add` - Add coins to trade proposal
-  - `/trade coins remove` - Remove coins from trade proposal
+  - ✅ `/trade coins add` - Add coins to trade proposal (with validation)
+  - ✅ `/trade coins remove` - Remove coins from trade proposal
+- **Discord Commands - NBA Trading** (Trade cog):
+  - `/trade add` - Add NBA collectibles to ongoing trade
+  - `/trade remove` - Remove NBA collectibles from ongoing trade
+  - Both commands work via the Trade interface (use `/trade begin` to start)
 - **Discord Commands - Packs** (PacksCommands cog with autocomplete):
-  - `/packs list [sorting] [reverse]` - List packs with optional sort by name/cost and reverse order
-  - `/packs buy pack: [amount]` - Buy packs (autocomplete selection, optional quantity)
-  - `/packs inventory` - View your owned packs
-  - `/packs give user: pack: [amount]` - Give pack to another player (autocomplete, optional quantity)
-  - `/packs open pack: [ephemeral]` - Open a pack from inventory (autocomplete, optional visibility)
-- **Admin Panel Integration** ✅ Fully Working:
+  - ✅ `/packs list [sorting] [reverse]` - List packs with optional sort by name/cost and reverse order
+  - ✅ `/packs buy pack: [amount]` - Buy packs (autocomplete selection, optional quantity)
+  - ✅ `/packs inventory` - View your owned packs
+  - ✅ `/packs give user: pack: [amount]` - Give pack to another player (autocomplete, optional quantity)
+  - ✅ `/packs open pack: [ephemeral]` - Open a pack from inventory (autocomplete, optional visibility)
+- **Admin Panel Integration** ✅ Mostly Working:
   - Pack management: Create/edit packs with full control
-  - CoinReward inline editing within pack editor
+  - CoinReward management: Add/edit reward types
   - CoinTransaction history view (read-only, admin-only)
   - All models properly synced between Tortoise ORM (bot) and Django ORM (admin)
 - **Economy Features**:
   - Player coins start at 0 (configured via admin panel)
   - All transactions recorded in database for auditing
   - Autocomplete-based pack selection (not pagination)
+  - Coin validation: Can't add coins you don't have to trades
+  - Coins display in live trade messages with NBAs
   - Coin economy fully controllable through admin panel (no hardcoded values)
-  - All 8 commands successfully synced and operational
+  - 8 commands synced and operational
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
