@@ -96,6 +96,7 @@ class Trade(commands.GroupCog):
         return result
 
     bulk = app_commands.Group(name="bulk", description="Bulk Commands")
+    items = app_commands.Group(name="items", description="Add or remove NBA collectibles in trades")
 
     def get_trade(
         self,
@@ -225,8 +226,8 @@ class Trade(commands.GroupCog):
         await menu.start()
         await interaction.response.send_message("Trade started!", ephemeral=True)
 
-    @app_commands.command(extras={"trade": TradeCommandType.PICK})
-    async def add(
+    @items.command(name="add", description="Add an NBA collectible to your trade")
+    async def items_add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         countryball: BallInstanceTransform,
@@ -297,7 +298,7 @@ class Trade(commands.GroupCog):
             f"{countryball.countryball.country} added.", ephemeral=True
         )
 
-    @bulk.command(name="add", extras={"trade": TradeCommandType.PICK})
+    @bulk.command(name="add")
     async def bulk_add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
@@ -357,8 +358,8 @@ class Trade(commands.GroupCog):
             f"the selected {settings.plural_collectible_name} will remain."
         )
 
-    @app_commands.command(extras={"trade": TradeCommandType.REMOVE})
-    async def remove(
+    @items.command(name="remove", description="Remove an NBA collectible from your trade")
+    async def items_remove(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         countryball: BallInstanceTransform,
@@ -519,9 +520,9 @@ class Trade(commands.GroupCog):
     # ===== COINS SUBGROUP =====
     coins = app_commands.Group(name="coins", description="Add or remove coins in a trade")
 
-    @coins.command(description="Add coins to your trade proposal")
+    @coins.command(name="add", description="Add coins to your trade proposal")
     @app_commands.describe(amount="Amount of coins to add")
-    async def add(
+    async def coins_add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         amount: int,
@@ -565,9 +566,9 @@ class Trade(commands.GroupCog):
         except Exception as e:
             await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
-    @coins.command(description="Remove coins from your trade proposal")
+    @coins.command(name="remove", description="Remove coins from your trade proposal")
     @app_commands.describe(amount="Amount of coins to remove")
-    async def remove(
+    async def coins_remove(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         amount: int,

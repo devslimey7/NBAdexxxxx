@@ -26,9 +26,13 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - ✅ `/trade coins add` - Add coins to trade proposal (with validation)
   - ✅ `/trade coins remove` - Remove coins from trade proposal
 - **Discord Commands - NBA Trading** (Trade cog):
-  - `/trade add` - Add NBA collectibles to ongoing trade
-  - `/trade remove` - Remove NBA collectibles from ongoing trade
-  - Both commands work via the Trade interface (use `/trade begin` to start)
+  - ✅ `/trade items add` - Add NBA collectibles to ongoing trade
+  - ✅ `/trade items remove` - Remove NBA collectibles from ongoing trade
+  - ✅ `/trade begin` - Start a trade with another player
+  - ✅ `/trade cancel` - Cancel ongoing trade
+  - ✅ `/trade view` - View trade proposals
+  - ✅ `/trade history` - View trade history with filters
+  - ✅ `/trade bulk add` - Bulk add collectibles with filters
 - **Discord Commands - Packs** (PacksCommands cog with autocomplete):
   - ✅ `/packs list [sorting] [reverse]` - List packs with optional sort by name/cost and reverse order
   - ✅ `/packs buy pack: [amount]` - Buy packs (autocomplete selection, optional quantity)
@@ -47,7 +51,10 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Coin validation: Can't add coins you don't have to trades
   - Coins display in live trade messages with NBAs
   - Coin economy fully controllable through admin panel (no hardcoded values)
-  - 8 commands synced and operational
+  - 10+ commands synced and operational
+  - Trade system fully integrated with coins and collectibles
+  - Database migrations completed (Pack, CoinReward, CoinTransaction models)
+  - Admin panel fully functional with no database errors
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
