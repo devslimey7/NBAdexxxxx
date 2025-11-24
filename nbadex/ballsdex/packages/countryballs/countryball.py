@@ -95,6 +95,8 @@ class CountryballNamePrompt(Modal, title=f"Catch this {settings.collectible_name
                 allowed_mentions=await can_mention([player]),
                 ephemeral=False,
             )
+            # Reset spawn time on wrong guess so they get another 10 minutes
+            self.view.spawn_time = datetime.now()
             return
 
         ball, has_caught_before = await self.view.catch_ball(
@@ -139,7 +141,7 @@ class BallSpawnView(View):
     """
 
     def __init__(self, bot: "BallsDexBot", model: Ball):
-        super().__init__(timeout=600)
+        super().__init__(timeout=None)
         self.bot = bot
         self.model = model
         self.algo: str | None = None
@@ -150,6 +152,7 @@ class BallSpawnView(View):
         self.atk_bonus: int | None = None
         self.hp_bonus: int | None = None
         self.og_id: int
+        self.spawn_time: datetime = datetime.now()
 
         self.catch_button.label = settings.catch_button_label
 
@@ -168,6 +171,21 @@ class BallSpawnView(View):
 
     @button(style=discord.ButtonStyle.primary, label="Catch me!")
     async def catch_button(self, interaction: discord.Interaction["BallsDexBot"], button: Button):
+        # Check if 10 minutes have passed since spawn
+        elapsed = (datetime.now() - self.spawn_time).total_seconds()
+        if elapsed >= 600:
+            self.catch_button.disabled = True
+            if self.message:
+                try:
+                    await self.message.edit(view=self)
+                except discord.HTTPException:
+                    pass
+            if self.ballinstance and not self.caught:
+                await self.ballinstance.unlock()
+            self.stop()
+            await interaction.response.send_message("This NBA has despawned!", ephemeral=True)
+            return
+        
         if self.caught:
             await interaction.response.send_message("I was caught already!", ephemeral=True)
         else:
