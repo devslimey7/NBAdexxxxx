@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from ..models import Pack, CoinReward, CoinTransaction, PackContent
+from ..models import Pack, CoinReward, CoinTransaction, PackContent, EconomyConfig
 
 
 class PackContentInline(admin.TabularInline):
@@ -47,6 +47,30 @@ class CoinTransactionAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+@admin.register(EconomyConfig)
+class EconomyConfigAdmin(admin.ModelAdmin):
+    list_display = ("name", "starting_coins", "catch_reward", "pack_open_reward")
+    fieldsets = (
+        ("Configuration", {
+            "fields": ("name",)
+        }),
+        ("Coin Rewards", {
+            "fields": ("starting_coins", "catch_reward", "pack_open_reward"),
+            "description": "All values are in coins. Configure your economy rewards here."
+        }),
+        ("Trading", {
+            "fields": ("trade_fee_percent",),
+            "description": "Fee as percentage (0.0 to 1.0, e.g., 0.1 = 10%)"
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PackContent)
