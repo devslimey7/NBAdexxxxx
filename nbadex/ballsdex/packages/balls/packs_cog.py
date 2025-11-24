@@ -252,7 +252,7 @@ class PacksCommands(commands.Cog):
 async def get_enabled_packs():
     """Get all enabled packs from the database"""
     try:
-        from bd_models.models import Pack
+        from admin_panel.bd_models.models import Pack
 
         def fetch_packs():
             return list(
@@ -269,7 +269,7 @@ async def get_enabled_packs():
 async def get_pack_by_id(pack_id: int):
     """Get a pack by ID"""
     try:
-        from bd_models.models import Pack
+        from admin_panel.bd_models.models import Pack
 
         def fetch_pack():
             pack = Pack.objects.get(id=pack_id, enabled=True)
@@ -290,10 +290,10 @@ async def get_pack_by_id(pack_id: int):
 async def get_user_pack_count(discord_id: int, pack_id: int):
     """Get count of packs owned by user"""
     try:
-        from bd_models.models import PlayerPack
+        from admin_panel.bd_models.models import PlayerPack
 
         def count_packs():
-            from bd_models.models import Player as DjangoPlayer
+            from admin_panel.bd_models.models import Player as DjangoPlayer
             try:
                 player = DjangoPlayer.objects.get(discord_id=discord_id)
                 count = PlayerPack.objects.filter(player=player, pack_id=pack_id).count()
@@ -309,7 +309,7 @@ async def get_user_pack_count(discord_id: int, pack_id: int):
 async def get_user_packs(discord_id: int):
     """Get all packs owned by user"""
     try:
-        from bd_models.models import PlayerPack, Player as DjangoPlayer
+        from admin_panel.bd_models.models import PlayerPack, Player as DjangoPlayer
         from django.db.models import Count
 
         def fetch_user_packs():
@@ -343,7 +343,7 @@ async def get_user_packs(discord_id: int):
 async def log_transaction(discord_id: int, amount: int, reason: str):
     """Log a coin transaction"""
     try:
-        from bd_models.models import CoinTransaction, Player as DjangoPlayer
+        from admin_panel.bd_models.models import CoinTransaction, Player as DjangoPlayer
 
         def create_transaction():
             player = DjangoPlayer.objects.get(discord_id=discord_id)
