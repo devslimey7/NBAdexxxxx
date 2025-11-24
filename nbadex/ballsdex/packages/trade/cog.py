@@ -96,7 +96,7 @@ class Trade(commands.GroupCog):
         return result
 
     bulk = app_commands.Group(name="bulk", description="Bulk Commands")
-    items = app_commands.Group(name="items", description="Add or remove NBA collectibles in trades")
+    nba = app_commands.Group(name="nba", description="Add or remove NBA collectibles in trades")
 
     def get_trade(
         self,
@@ -226,8 +226,8 @@ class Trade(commands.GroupCog):
         await menu.start()
         await interaction.response.send_message("Trade started!", ephemeral=True)
 
-    @items.command(name="add", description="Add an NBA collectible to your trade")
-    async def items_add(
+    @nba.command(name="add", description="Add an NBA collectible to your trade")
+    async def nba_add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         countryball: BallInstanceTransform,
@@ -358,8 +358,8 @@ class Trade(commands.GroupCog):
             f"the selected {settings.plural_collectible_name} will remain."
         )
 
-    @items.command(name="remove", description="Remove an NBA collectible from your trade")
-    async def items_remove(
+    @nba.command(name="remove", description="Remove an NBA collectible from your trade")
+    async def nba_remove(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         countryball: BallInstanceTransform,

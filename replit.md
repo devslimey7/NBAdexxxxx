@@ -26,8 +26,8 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - ✅ `/trade coins add` - Add coins to trade proposal (with validation)
   - ✅ `/trade coins remove` - Remove coins from trade proposal
 - **Discord Commands - NBA Trading** (Trade cog):
-  - ✅ `/trade items add` - Add NBA collectibles to ongoing trade
-  - ✅ `/trade items remove` - Remove NBA collectibles from ongoing trade
+  - ✅ `/trade nba add` - Add NBA collectibles to ongoing trade
+  - ✅ `/trade nba remove` - Remove NBA collectibles from ongoing trade
   - ✅ `/trade begin` - Start a trade with another player
   - ✅ `/trade cancel` - Cancel ongoing trade
   - ✅ `/trade view` - View trade proposals
