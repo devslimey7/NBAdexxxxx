@@ -12,37 +12,8 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 24, 2025)
 
-## Pack System Implementation (Complete & Fully Operational)
-- **Fixed Tortoise ORM Models**:
-  - `Pack`: Synced with existing database schema - name, description, cost (coins), enabled, emoji, open_reward
-  - `PlayerPack`: Player's owned packs with count tracking (using existing player_pack table)
-  - `Player.coins`: Uses existing coins field (not custom points field)
-  
-- **Discord Commands** (`/packs` - ROOT LEVEL, not nested):
-  - `/packs list [sorting]`: Show all available packs with descriptions, costs, and ownership count
-    - Sorting options: alphabetical, price (by cost), reward (by open_reward)
-  - `/packs buy <pack> [amount]`: Purchase packs with coins, adds to inventory
-  - `/packs inventory`: Show all owned packs with counts (now working!)
-  - `/packs open <pack>`: Open/use a pack from your inventory
-  - `/packs give <user> <pack> [amount]`: Transfer packs to other users
-
-- **Admin Panel** (Django):
-  - Pack/PlayerPack models registered and manageable via admin interface
-  - Create, edit, delete packs with cost and description
-  - View and modify player pack inventories
-
-- **Economy Features**:
-  - Coin-based currency system (separate from NBA collectible system)
-  - Packs managed via admin panel or admin commands
-  - Players can purchase packs using coins from `/nba` commands
-  - Complete pack ownership tracking with per-user counts
-
-## Bug Fixes (This Session)
-- **Fixed**: Database schema mismatch - Tortoise ORM Pack model now matches actual PostgreSQL schema
-- **Fixed**: Changed from `points`/`price` terminology to use existing `coins`/`cost` fields
-- **Fixed**: Pack commands now root-level `/packs` instead of `/nba packs`
-- **Fixed**: Command nesting and admin panel registration issues
-- **Result**: All pack commands now fully functional, admin panel showing all models
+- Removed economy system (coins, packs, CoinReward, CoinTransaction) - not needed
+- Bot and admin panel running smoothly with all core features
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch

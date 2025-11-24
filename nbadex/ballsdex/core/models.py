@@ -599,38 +599,3 @@ class Block(models.Model):
 
     def __str__(self) -> str:
         return str(self.pk)
-
-
-class Pack(models.Model):
-    """Purchasable pack item"""
-    id: int
-    name = fields.CharField(max_length=255, description="Name of the pack")
-    description = fields.TextField(description="Description of pack contents", default="")
-    cost = fields.IntField(default=0, description="Cost in coins")
-    enabled = fields.BooleanField(default=True, description="Whether pack is available")
-    emoji = fields.CharField(max_length=20, default="📦", description="Emoji for the pack")
-    open_reward = fields.BigIntField(default=0, description="Reward coins when pack is opened")
-
-    def __str__(self) -> str:
-        return f"{self.emoji} {self.name}" if self.emoji else self.name
-
-
-class PlayerPack(models.Model):
-    """Player's owned packs"""
-    id: int
-    player: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
-        "models.Player", related_name="packs", on_delete=fields.CASCADE
-    )
-    pack: fields.ForeignKeyRelation[Pack] = fields.ForeignKeyField(
-        "models.Pack", on_delete=fields.CASCADE
-    )
-    count = fields.IntField(default=1, description="How many of this pack the player owns")
-    
-    class Meta:
-        indexes = [
-            PostgreSQLIndex(fields=("player_id",)),
-            PostgreSQLIndex(fields=("pack_id",)),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.player.discord_id} - {self.pack.name} x{self.count}"

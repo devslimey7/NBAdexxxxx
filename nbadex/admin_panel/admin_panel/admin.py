@@ -1,7 +1,6 @@
 from django.contrib import admin
 
 from ballsdex.settings import settings
-from bd_models.models import Pack, PlayerPack
 
 
 class BallsdexAdminSite(admin.AdminSite):
@@ -9,25 +8,3 @@ class BallsdexAdminSite(admin.AdminSite):
     site_title = f"{settings.bot_name} admin panel"
     site_url = None  # type: ignore
     final_catch_all_view = False
-
-
-class PackAdmin(admin.ModelAdmin):
-    list_display = ("emoji", "name", "cost", "enabled")
-    search_fields = ("name",)
-    list_filter = ("enabled",)
-    fieldsets = (
-        ("Pack Info", {"fields": ("name", "description", "emoji")}),
-        ("Economy", {"fields": ("cost", "open_reward")}),
-        ("Status", {"fields": ("enabled",)}),
-    )
-
-
-class PlayerPackInline(admin.TabularInline):
-    model = PlayerPack
-    extra = 0
-    fields = ("pack", "count")
-
-
-# Register models
-admin.site.register(Pack, PackAdmin)
-admin.site.register(PlayerPack)

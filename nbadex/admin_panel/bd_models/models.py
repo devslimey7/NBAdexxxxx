@@ -87,7 +87,6 @@ class Player(models.Model):
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
     extra_data = models.JSONField(blank=True, default=dict)
-    points = models.IntegerField(default=0, help_text="Player's points balance")
 
     def is_blacklisted(self) -> bool:
         blacklist = cast(
@@ -423,35 +422,3 @@ class Block(models.Model):
     class Meta:
         managed = True
         db_table = "block"
-
-
-class Pack(models.Model):
-    """Purchasable pack item"""
-    name = models.CharField(max_length=255, help_text="Name of the pack")
-    description = models.TextField(help_text="Description of pack contents", default="")
-    cost = models.IntegerField(help_text="Cost in coins", default=0)
-    enabled = models.BooleanField(help_text="Whether pack is available", default=True)
-    emoji = models.CharField(max_length=20, help_text="Emoji for the pack", default="📦")
-    open_reward = models.BigIntegerField(help_text="Reward coins when opened", default=0)
-
-    def __str__(self) -> str:
-        return f"{self.emoji} {self.name}" if self.emoji else self.name
-
-    class Meta:
-        managed = True
-        db_table = "pack"
-
-
-class PlayerPack(models.Model):
-    """Player's owned packs"""
-    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="packs")
-    player_id: int
-    pack = models.ForeignKey(Pack, on_delete=models.CASCADE)
-    pack_id: int
-
-    def __str__(self) -> str:
-        return f"{self.player.discord_id} - {self.pack.name}"
-
-    class Meta:
-        managed = True
-        db_table = "player_pack"
