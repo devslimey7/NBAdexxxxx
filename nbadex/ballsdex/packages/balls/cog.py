@@ -1217,9 +1217,9 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             
             log.info("Updating claim date")
             
-            # Update last claim date and award coins
+            # Update last claim date and award coins (10 coins per claim)
             player.extra_data["last_claim_date"] = now.isoformat()
-            player.coins += selected_ball.coin_reward
+            player.coins += 10
             await player.save()
             
             log.info("Preparing message")
@@ -1229,8 +1229,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             
             log.info("Sending response")
             
-            coin_text = f"\n+**{selected_ball.coin_reward}** 👑" if selected_ball.coin_reward > 0 else ""
-            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*{coin_text}"
+            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*\n+**10** 👑"
             
             await interaction.followup.send(
                 content=congrats_msg,

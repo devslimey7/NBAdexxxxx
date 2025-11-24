@@ -183,9 +183,6 @@ class Ball(models.Model):
     )
     capacity_logic = fields.JSONField(description="Effect of this capacity", default={})
     created_at = fields.DatetimeField(auto_now_add=True, null=True)
-    coin_reward = fields.IntField(
-        default=0, description="Number of coins awarded when this ball is caught"
-    )
 
     instances: fields.BackwardFKRelation[BallInstance]
 

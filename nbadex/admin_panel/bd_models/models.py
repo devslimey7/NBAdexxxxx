@@ -231,9 +231,6 @@ class Ball(models.Model):
     regime_id: int
     created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, editable=False)
     translations = models.TextField(blank=True, null=True)
-    coin_reward = models.IntegerField(
-        default=0, help_text="Number of coins awarded when this ball is caught"
-    )
 
     def __str__(self) -> str:
         return self.country

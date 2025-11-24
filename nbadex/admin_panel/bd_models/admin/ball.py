@@ -95,7 +95,6 @@ class BallAdmin(admin.ModelAdmin):
                     "health",
                     "attack",
                     "rarity",
-                    "coin_reward",
                     "emoji_id",
                     "economy",
                     "regime",
