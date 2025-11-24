@@ -521,7 +521,7 @@ class Trade(commands.GroupCog):
 
     @coins.command(description="Add coins to your trade proposal")
     @app_commands.describe(amount="Amount of coins to add")
-    async def add_coins(
+    async def add(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         amount: int,
@@ -561,7 +561,7 @@ class Trade(commands.GroupCog):
 
     @coins.command(description="Remove coins from your trade proposal")
     @app_commands.describe(amount="Amount of coins to remove")
-    async def remove_coins(
+    async def remove(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         amount: int,

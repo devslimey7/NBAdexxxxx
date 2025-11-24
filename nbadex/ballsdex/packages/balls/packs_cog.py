@@ -1,9 +1,10 @@
-"""Packs shop with interactive UI for Discord bot"""
+"""Packs shop with paginated UI for Discord bot"""
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import Select, View, select
 from ballsdex.core.models import Player
+from ballsdex.core.utils.paginator import Pages
+from ballsdex.core.utils.menus import ListPageSource
 from ballsdex.settings import settings
 from asgiref.sync import sync_to_async
 
@@ -11,26 +12,47 @@ if False:
     from ballsdex.core.bot import BallsDexBot
 
 
-class PackSelectView(View):
-    """Interactive pack selection view"""
+class PackPageSource(ListPageSource):
+    """Page source for displaying packs"""
 
-    def __init__(self, interaction: discord.Interaction, packs: list, action: str = "buy"):
-        super().__init__(timeout=60)
-        self.interaction = interaction
+    def __init__(self, entries, cog):
+        super().__init__(entries, per_page=5)
+        self.cog = cog
+
+    async def format_page(self, menu: Pages, entries):
+        embed = discord.Embed(title="📦 Available Packs", color=discord.Color.blue())
+        
+        for pack in entries:
+            embed.add_field(
+                name=f"{pack['emoji']} {pack['name']}",
+                value=f"**{pack['cost']} coins** - {pack['description'] or 'No description'}",
+                inline=False,
+            )
+
+        maximum = self.get_max_pages()
+        if maximum > 1:
+            embed.set_footer(text=f"Page {menu.current_page + 1}/{maximum}")
+        
+        return embed
+
+
+class PackSelectPages(Pages):
+    """Paginated pack selector with confirmation"""
+
+    def __init__(self, interaction: discord.Interaction["BallsDexBot"], packs: list, cog, action: str = "buy"):
+        source = PackPageSource(packs, cog)
+        super().__init__(source, interaction=interaction)
         self.packs = packs
+        self.cog = cog
         self.action = action
         self.selected_pack = None
-        self._update_options()
 
-    @select(placeholder="Choose a pack...", min_values=1, max_values=1)
-    async def pack_select(self, interaction: discord.Interaction["BallsDexBot"], select: Select):
-        """Select a pack"""
-        await interaction.response.defer(ephemeral=True)
-        pack_id = int(select.values[0])
+    async def on_pack_select(self, pack_id: int, interaction: discord.Interaction["BallsDexBot"]):
+        """Called when a pack is selected"""
         self.selected_pack = next((p for p in self.packs if p["id"] == pack_id), None)
-
+        
         if not self.selected_pack:
-            await interaction.followup.send("Pack not found!", ephemeral=True)
+            await interaction.response.send_message("Pack not found!", ephemeral=True)
             return
 
         if self.action == "buy":
@@ -40,61 +62,68 @@ class PackSelectView(View):
         elif self.action == "open":
             await self.handle_open(interaction)
 
-        self.stop()
-
-    def _update_options(self):
-        """Update select options from packs"""
-        options = []
-        for pack in self.packs:
-            emoji = pack.get("emoji", "📦")
-            options.append(
-                discord.SelectOption(
-                    label=pack["name"],
-                    description=f"{emoji} • {pack['cost']} coins",
-                    value=str(pack["id"]),
-                )
-            )
-        if options:
-            self.pack_select.options = options
-
     async def handle_buy(self, interaction: discord.Interaction["BallsDexBot"]):
-        """Handle pack purchase"""
+        """Handle pack purchase with confirmation"""
         try:
-            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
-
-            if player.coins < self.selected_pack["cost"]:
-                await interaction.followup.send(
-                    f"Not enough coins! You have {player.coins:,} but need {self.selected_pack['cost']:,}.",
-                    ephemeral=True,
+            # Show confirmation
+            view = discord.ui.View()
+            
+            async def confirm_callback(button_interaction: discord.Interaction):
+                await button_interaction.response.defer(ephemeral=True)
+                player, _ = await Player.get_or_create(discord_id=button_interaction.user.id)
+                
+                if player.coins < self.selected_pack["cost"]:
+                    await button_interaction.followup.send(
+                        f"Not enough coins! You have {player.coins:,} but need {self.selected_pack['cost']:,}.",
+                        ephemeral=True,
+                    )
+                    return
+                
+                player.coins -= self.selected_pack["cost"]
+                await player.save()
+                
+                await log_transaction(
+                    button_interaction.user.id,
+                    -self.selected_pack["cost"],
+                    f"Pack purchase: {self.selected_pack['name']}",
                 )
-                return
-
-            player.coins -= self.selected_pack["cost"]
-            await player.save()
-
-            # Log transaction
-            await log_transaction(
-                interaction.user.id,
-                -self.selected_pack["cost"],
-                f"Pack purchase: {self.selected_pack['name']}",
-            )
-
+                
+                embed = discord.Embed(
+                    title="✅ Pack Purchased!",
+                    description=f"You successfully bought 1x {self.selected_pack['emoji']} **{self.selected_pack['name']}** pack!",
+                    color=discord.Color.green(),
+                )
+                await button_interaction.followup.send(embed=embed, ephemeral=True)
+            
+            async def cancel_callback(button_interaction: discord.Interaction):
+                await button_interaction.response.defer(ephemeral=True)
+                await button_interaction.followup.send("Purchase cancelled.", ephemeral=True)
+            
+            yes_button = discord.ui.Button(style=discord.ButtonStyle.success, label="✓ Yes", custom_id="pack_confirm_yes")
+            no_button = discord.ui.Button(style=discord.ButtonStyle.danger, label="✗ No", custom_id="pack_confirm_no")
+            
+            yes_button.callback = confirm_callback
+            no_button.callback = cancel_callback
+            
+            view.add_item(yes_button)
+            view.add_item(no_button)
+            
             embed = discord.Embed(
-                title="✅ Pack Purchased",
-                description=f"You bought **{self.selected_pack['name']}**!\nCost: {self.selected_pack['cost']:,} coins",
-                color=discord.Color.green(),
+                title="Confirm Purchase",
+                description=f"Are you sure you want to buy 1x {self.selected_pack['emoji']} **{self.selected_pack['name']}** pack for **{self.selected_pack['cost']} coins**?",
+                color=discord.Color.blurple(),
             )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f"Error: {e}", ephemeral=True)
+            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
     async def handle_give(self, interaction: discord.Interaction["BallsDexBot"]):
         """Handle pack gifting"""
-        await interaction.followup.send("Pack gifting coming soon!", ephemeral=True)
+        await interaction.response.send_message("Pack gifting coming soon!", ephemeral=True)
 
     async def handle_open(self, interaction: discord.Interaction["BallsDexBot"]):
         """Handle pack opening"""
-        await interaction.followup.send("Pack opening coming soon!", ephemeral=True)
+        await interaction.response.send_message("Pack opening coming soon!", ephemeral=True)
 
 
 class PacksCommands(commands.Cog):
@@ -116,15 +145,9 @@ class PacksCommands(commands.Cog):
                 await interaction.followup.send("No packs available!", ephemeral=True)
                 return
 
-            embed = discord.Embed(title="📦 Available Packs", color=discord.Color.blue())
-            for pack in packs:
-                emoji = pack.get("emoji", "📦")
-                embed.add_field(
-                    name=f"{emoji} {pack['name']}",
-                    value=f"**{pack['cost']} coins**\n{pack['description'] or 'No description'}",
-                    inline=False,
-                )
-            await interaction.followup.send(embed=embed)
+            source = PackPageSource(packs, self)
+            pages = Pages(source=source, interaction=interaction)
+            await pages.start()
         except Exception as e:
             await interaction.followup.send(f"Error loading packs: {e}", ephemeral=True)
 
@@ -138,10 +161,8 @@ class PacksCommands(commands.Cog):
                 await interaction.followup.send("No packs available!", ephemeral=True)
                 return
 
-            view = PackSelectView(interaction, packs, action="buy")
-            await interaction.followup.send(
-                "Select a pack to buy:", view=view, ephemeral=True
-            )
+            pages = PackSelectPages(interaction, packs, self, action="buy")
+            await pages.start(content="**Select a pack to buy:**", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
@@ -169,10 +190,8 @@ class PacksCommands(commands.Cog):
                 await interaction.followup.send("No packs available!", ephemeral=True)
                 return
 
-            view = PackSelectView(interaction, packs, action="give")
-            await interaction.followup.send(
-                f"Select a pack to give to {user.mention}:", view=view, ephemeral=True
-            )
+            pages = PackSelectPages(interaction, packs, self, action="give")
+            await pages.start(content=f"**Select a pack to give to {user.mention}:**", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
@@ -186,10 +205,8 @@ class PacksCommands(commands.Cog):
                 await interaction.followup.send("No packs available!", ephemeral=True)
                 return
 
-            view = PackSelectView(interaction, packs, action="open")
-            await interaction.followup.send(
-                "Select a pack to open:", view=view, ephemeral=True
-            )
+            pages = PackSelectPages(interaction, packs, self, action="open")
+            await pages.start(content="**Select a pack to open:**", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
@@ -208,6 +225,9 @@ async def get_enabled_packs():
             )
 
         packs = await sync_to_async(fetch_packs)()
+        # Add default emoji to each pack
+        for pack in packs:
+            pack["emoji"] = "📦"
         return packs
     except Exception as e:
         print(f"Error fetching packs: {e}")
