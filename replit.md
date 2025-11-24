@@ -14,15 +14,23 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 ## Economy System Implementation ✅ COMPLETE
 - **Database Models** (Tortoise ORM + Django):
-  - `Pack`: Purchasable packs with cost, emoji, description, enabled status, timestamps
+  - `Pack`: Purchasable packs with cost, description, enabled status, timestamps
   - `CoinReward`: Rewards tied to packs with amount and probability
-  - `CoinTransaction`: Complete audit log of all coin movements (player, amount, reason, pack, timestamp)
-- **Discord Commands** (Working):
-  - `/balance` - Check your coin balance (stores in Player.coins)
-  - `/pack` - Interactive pack shop with selectable purchases
-    - Shows available packs with cost and descriptions
-    - One-click purchase processing with instant rewards
-    - Records all transactions automatically
+  - `CoinTransaction`: Complete audit log of all coin movements (player, amount, reason, timestamp)
+  - `Player.coins`: Coin balance for each player
+  - `PlayerPack`: Tracks pack ownership for each player
+- **Discord Commands - Coins** (EconomyCommands cog):
+  - `/coins balance` - Check your coin balance
+  - `/coins leaderboard` - View top 10 coin holders
+- **Discord Commands - Trade Coins** (Trade cog):
+  - `/trade coins add` - Add coins to trade proposal
+  - `/trade coins remove` - Remove coins from trade proposal
+- **Discord Commands - Packs** (PacksCommands cog with autocomplete):
+  - `/packs list` - List all available packs with ownership count
+  - `/packs buy pack:` - Buy a pack with autocomplete selection and cost confirmation
+  - `/packs inventory` - View your owned packs
+  - `/packs give user: pack:` - Give pack to another player
+  - `/packs open pack:` - Open a pack from inventory
 - **Admin Panel Integration** ✅ Fully Working:
   - Pack management: Create/edit packs with full control
   - CoinReward inline editing within pack editor
@@ -31,8 +39,9 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - **Economy Features**:
   - Player coins start at 0 (configured via admin panel)
   - All transactions recorded in database for auditing
-  - Selectable pack UI matching drop command design
+  - Autocomplete-based pack selection (not pagination)
   - Coin economy fully controllable through admin panel (no hardcoded values)
+  - All 8 commands successfully synced and operational
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch
@@ -80,9 +89,11 @@ Deployment: Production-grade server (Gunicorn), not development server.
 **Key cogs**:
 - `CountryBallsSpawner`: Handles spawning collectibles in channels based on message activity
 - `Balls`: Player inventory management, info commands, donations
+- `EconomyCommands`: Coin balance and leaderboard commands
+- `PacksCommands`: Pack shop with autocomplete-based selection
 - `Admin`: Administrative commands for bot owners/staff
 - `Config`: Server configuration and setup
-- `Trade`: Trading system between players
+- `Trade`: Trading system between players, coin transfers
 
 ### Spawn System
 
