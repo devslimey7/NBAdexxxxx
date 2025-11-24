@@ -12,29 +12,37 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 24, 2025)
 
-## Pack System Implementation (Complete)
-- **New Models** (Tortoise ORM & Django):
-  - `Pack`: Purchasable pack with name, emoji, description, and price (in points)
-  - `PlayerPack`: Player's owned packs with count tracking
-  - `Player.points`: Player's points balance (currency for pack purchases)
-- **Discord Commands** (`/packs` group):
-  - `/packs list [sorting]`: Show all available packs with descriptions, prices, and ownership count
-    - Sorting options: alphabetical, price, created_at
-  - `/packs buy <pack> [amount]`: Purchase packs with points, adds to inventory
-  - `/packs inventory`: Show all owned packs with counts
+## Pack System Implementation (Complete & Fully Operational)
+- **Fixed Tortoise ORM Models**:
+  - `Pack`: Synced with existing database schema - name, description, cost (coins), enabled, emoji, open_reward
+  - `PlayerPack`: Player's owned packs with count tracking (using existing player_pack table)
+  - `Player.coins`: Uses existing coins field (not custom points field)
+  
+- **Discord Commands** (`/packs` - ROOT LEVEL, not nested):
+  - `/packs list [sorting]`: Show all available packs with descriptions, costs, and ownership count
+    - Sorting options: alphabetical, price (by cost), reward (by open_reward)
+  - `/packs buy <pack> [amount]`: Purchase packs with coins, adds to inventory
+  - `/packs inventory`: Show all owned packs with counts (now working!)
   - `/packs open <pack>`: Open/use a pack from your inventory
   - `/packs give <user> <pack> [amount]`: Transfer packs to other users
-- **Admin Commands** (`/admin packs` group):
-  - `/admin packs add <user> <pack> [amount]`: Add packs to user's inventory
-  - `/admin packs remove <user> <pack> [amount]`: Remove packs from user's inventory
-- **Admin Panel**:
-  - Pack management: Create, edit, view all packs with price and description
-  - PlayerPack management: View and modify player pack inventories
+
+- **Admin Panel** (Django):
+  - Pack/PlayerPack models registered and manageable via admin interface
+  - Create, edit, delete packs with cost and description
+  - View and modify player pack inventories
+
 - **Economy Features**:
-  - Points-based currency system (separate from collection mechanics)
-  - All packs start empty - admins create them in admin panel
-  - Players earn points (admins control via database)
+  - Coin-based currency system (separate from NBA collectible system)
+  - Packs managed via admin panel or admin commands
+  - Players can purchase packs using coins from `/nba` commands
   - Complete pack ownership tracking with per-user counts
+
+## Bug Fixes (This Session)
+- **Fixed**: Database schema mismatch - Tortoise ORM Pack model now matches actual PostgreSQL schema
+- **Fixed**: Changed from `points`/`price` terminology to use existing `coins`/`cost` fields
+- **Fixed**: Pack commands now root-level `/packs` instead of `/nba packs`
+- **Fixed**: Command nesting and admin panel registration issues
+- **Result**: All pack commands now fully functional, admin panel showing all models
 
 ## Previous Session (Nov 23, 2025)
 - **Drop Command** (`/nba drop`): Users can drop NBAs from inventory for others to catch

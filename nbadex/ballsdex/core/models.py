@@ -604,11 +604,12 @@ class Block(models.Model):
 class Pack(models.Model):
     """Purchasable pack item"""
     id: int
-    name = fields.CharField(max_length=64, description="Name of the pack")
-    emoji = fields.CharField(max_length=20, null=True, description="Emoji for the pack")
-    description = fields.TextField(description="Description of pack contents")
-    price = fields.IntField(description="Price in points")
-    created_at = fields.DatetimeField(auto_now_add=True)
+    name = fields.CharField(max_length=255, description="Name of the pack")
+    description = fields.TextField(description="Description of pack contents", default="")
+    cost = fields.IntField(default=0, description="Cost in coins")
+    enabled = fields.BooleanField(default=True, description="Whether pack is available")
+    emoji = fields.CharField(max_length=20, default="📦", description="Emoji for the pack")
+    open_reward = fields.BigIntField(default=0, description="Reward coins when pack is opened")
 
     def __str__(self) -> str:
         return f"{self.emoji} {self.name}" if self.emoji else self.name

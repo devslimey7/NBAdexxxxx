@@ -22,7 +22,7 @@ class Packs(commands.Cog):
     packs = app_commands.Group(name="packs", description="Pack management")
 
     @packs.command(name="list")
-    @app_commands.describe(sorting="Sort by: alphabetical, price, created_at")
+    @app_commands.describe(sorting="Sort by: alphabetical, price, or reward")
     async def packs_list(
         self,
         interaction: discord.Interaction["BallsDexBot"],
@@ -40,9 +40,9 @@ class Packs(commands.Cog):
             if sorting == "alphabetical":
                 packs = sorted(packs, key=lambda p: p.name)
             elif sorting == "price":
-                packs = sorted(packs, key=lambda p: p.price)
-            elif sorting == "created_at":
-                packs = sorted(packs, key=lambda p: p.created_at)
+                packs = sorted(packs, key=lambda p: p.cost)
+            elif sorting == "reward":
+                packs = sorted(packs, key=lambda p: p.open_reward)
 
             player, _ = await Player.get_or_create(discord_id=interaction.user.id)
             player_packs = await PlayerPack.filter(player=player).all()
@@ -54,7 +54,7 @@ class Packs(commands.Cog):
                 emoji = pack.emoji or "📦"
                 embed.add_field(
                     name=f"{i}. {emoji} {pack.name}",
-                    value=f"{pack.description}\nPrice: {pack.price} 💰 (You own {owned})",
+                    value=f"{pack.description}\nCost: {pack.cost} 💰 (You own {owned})",
                     inline=False,
                 )
             
@@ -82,10 +82,10 @@ class Packs(commands.Cog):
                 await interaction.followup.send("Pack not found.", ephemeral=True)
                 return
 
-            total_cost = pack_obj.price * amount
+            total_cost = pack_obj.cost * amount
             if player.coins < total_cost:
                 await interaction.followup.send(
-                    f"❌ Not enough points! Need {total_cost}, have {player.coins}.",
+                    f"❌ Not enough coins! Need {total_cost}, have {player.coins}.",
                     ephemeral=True,
                 )
                 return
@@ -104,7 +104,7 @@ class Packs(commands.Cog):
             emoji = pack_obj.emoji or "📦"
             await interaction.followup.send(
                 f"✅ Bought {amount}x {emoji} **{pack_obj.name}**!\n"
-                f"Spent {total_cost} points. Balance: {player.coins}"
+                f"Spent {total_cost} coins. Balance: {player.coins}"
             )
         except Exception as e:
             log.error(f"Error in packs buy: {e}")
