@@ -137,13 +137,6 @@ class BallAdmin(admin.ModelAdmin):
                 ],
             },
         ),
-        (
-            "Economy - Customize Rewards",
-            {
-                "description": "Coins awarded when player catches this NBA",
-                "fields": ["catch_reward"],
-            },
-        ),
     ]
 
     list_display = [

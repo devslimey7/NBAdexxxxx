@@ -21,10 +21,6 @@ class PackAdmin(admin.ModelAdmin):
         ("Pack Information", {
             "fields": ("name", "emoji", "cost", "description", "enabled")
         }),
-        ("Economy - Customize Rewards", {
-            "fields": ("open_reward",),
-            "description": "Coins awarded when player opens this pack"
-        }),
     )
 
 
