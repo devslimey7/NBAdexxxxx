@@ -86,7 +86,6 @@ class Player(models.Model):
     trade_cooldown_policy = models.SmallIntegerField(
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
-    coins = models.BigIntegerField(default=0, help_text="Total coins owned by this player")
     extra_data = models.JSONField(blank=True, default=dict)
 
     def is_blacklisted(self) -> bool:

@@ -1217,9 +1217,8 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             
             log.info("Updating claim date")
             
-            # Update last claim date and award coins (10 coins per claim)
+            # Update last claim date
             player.extra_data["last_claim_date"] = now.isoformat()
-            player.coins += 10
             await player.save()
             
             log.info("Preparing message")
@@ -1229,7 +1228,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             
             log.info("Sending response")
             
-            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*\n+**10** 👑"
+            congrats_msg = f"🎉 **Congratulations!** You claimed **{selected_ball.name}**!\n*{selected_ball.description}*"
             
             await interaction.followup.send(
                 content=congrats_msg,
@@ -1245,147 +1244,5 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             log.error(f"Error in claim command: {e}")
             await interaction.followup.send(
                 "An error occurred while claiming your daily reward.",
-                ephemeral=True,
-            )
-
-    @app_commands.command()
-    async def coins(self, interaction: discord.Interaction["BallsDexBot"]):
-        """
-        View your coin balance.
-        """
-        await interaction.response.defer(thinking=True, ephemeral=True)
-
-        try:
-            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
-            
-            embed = discord.Embed(
-                title=f"👑 Your Coins",
-                description=f"**{player.coins}** coins 👑",
-                color=discord.Color.gold(),
-            )
-            embed.set_footer(text="Earn coins by catching NBAs")
-
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        except Exception as e:
-            log.error(f"Error in coins command: {e}")
-            await interaction.followup.send(
-                "An error occurred while fetching your coin balance.",
-                ephemeral=True,
-            )
-
-    @app_commands.command()
-    async def give(self, interaction: discord.Interaction["BallsDexBot"], user: discord.User, amount: int):
-        """
-        Give coins to another player.
-        """
-        await interaction.response.defer(thinking=True, ephemeral=True)
-
-        try:
-            if amount <= 0:
-                await interaction.followup.send(
-                    "You must give at least 1 coin!",
-                    ephemeral=True,
-                )
-                return
-
-            sender, _ = await Player.get_or_create(discord_id=interaction.user.id)
-            recipient, _ = await Player.get_or_create(discord_id=user.id)
-
-            if sender.coins < amount:
-                await interaction.followup.send(
-                    f"You don't have enough coins! You have **{sender.coins}** coins.",
-                    ephemeral=True,
-                )
-                return
-
-            sender.coins -= amount
-            recipient.coins += amount
-            await sender.save()
-            await recipient.save()
-
-            embed = discord.Embed(
-                title="✅ Coins Transferred",
-                description=f"Gave **{amount}** coins 👑 to {user.mention}\n\nYour balance: **{sender.coins}** coins",
-                color=discord.Color.green(),
-            )
-
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        except Exception as e:
-            log.error(f"Error in give command: {e}")
-            await interaction.followup.send(
-                "An error occurred while transferring coins.",
-                ephemeral=True,
-            )
-
-    @app_commands.command()
-    async def coins_leaderboard(self, interaction: discord.Interaction["BallsDexBot"]):
-        """
-        Display the top 10 players ranked by coins.
-        """
-        await interaction.response.defer(thinking=True)
-
-        try:
-            # Get all players with their coin counts
-            players = await Player.all()
-            
-            # Filter players with coins and sort
-            player_coins = [(p, p.coins) for p in players if p.coins > 0]
-            top_10 = sorted(player_coins, key=lambda x: x[1], reverse=True)[:10]
-            
-            if not top_10:
-                await interaction.followup.send(
-                    "No players have coins yet.",
-                    ephemeral=True,
-                )
-                return
-
-            # Calculate global stats
-            total_coins = sum(coins for _, coins in top_10)
-            max_coins = top_10[0][1] if top_10 else 0
-
-            # Create embed with professional styling
-            embed = discord.Embed(
-                title="👑 COIN LEADERBOARD",
-                color=0xFFD700,  # Gold color
-            )
-            
-            # Add header with stats
-            embed.add_field(
-                name="📊 GLOBAL STATS",
-                value=f"**Top Players:** {len(top_10)}\n**Total Coins:** {total_coins}\n**Highest:** {max_coins}",
-                inline=False
-            )
-
-            # Build leaderboard
-            leaderboard_text = ""
-            medals = ["🥇", "🥈", "🥉"]
-            
-            for idx, (player, coins) in enumerate(top_10, 1):
-                try:
-                    user = await self.bot.fetch_user(player.discord_id)
-                    name = user.name
-                except discord.NotFound:
-                    name = "Unknown User"
-                
-                # Determine medal for top 3
-                medal = medals[idx - 1] if idx <= 3 else f"#{idx}"
-                
-                leaderboard_text += f"{medal} {name} · **{coins}** 👑\n"
-            
-            embed.add_field(
-                name="👑 TOP PLAYERS",
-                value=leaderboard_text,
-                inline=False
-            )
-            
-            embed.set_footer(text="Global coin rankings • Updated in real-time")
-            embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
-
-            await interaction.followup.send(embed=embed)
-
-        except Exception as e:
-            log.error(f"Error in coins leaderboard command: {e}")
-            await interaction.followup.send(
-                "An error occurred while fetching the coin leaderboard.",
                 ephemeral=True,
             )
