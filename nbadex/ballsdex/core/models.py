@@ -467,6 +467,7 @@ class Player(models.Model):
         default=TradeCooldownPolicy.COOLDOWN,
     )
     extra_data = fields.JSONField(default=dict)
+    coins = fields.BigIntField(default=0, description="Player's coin balance")
     balls: fields.BackwardFKRelation[BallInstance]
 
     def __str__(self) -> str:
