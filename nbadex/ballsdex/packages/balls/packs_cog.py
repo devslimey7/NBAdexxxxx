@@ -219,7 +219,7 @@ class PacksCommands(commands.Cog):
                 return
             
             # Award coins for opening the pack
-            await award_coins_from_reward(interaction.user.id, "pack_open", pack_data["name"])
+            await award_coins_from_reward(interaction.user.id, "pack_open", pack_data["name"], pack_id=pack_id)
             
             # Get ball name for message
             ball_name = ball_instance.ball.country
@@ -252,6 +252,13 @@ class PacksCommands(commands.Cog):
 async def get_enabled_packs():
     """Get all enabled packs from the database"""
     try:
+        # Setup Django in bot context
+        import django
+        import os
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
+        if not django.apps.apps.ready:
+            django.setup()
+        
         from admin_panel.bd_models.models import Pack
         
         def fetch_packs():
@@ -263,6 +270,7 @@ async def get_enabled_packs():
                     "cost": p.cost,
                     "description": p.description,
                     "emoji": p.emoji,
+                    "open_reward": p.open_reward,
                 })
             return packs_list
         
@@ -277,6 +285,12 @@ async def get_enabled_packs():
 async def get_pack_by_id(pack_id: int):
     """Get a pack by ID"""
     try:
+        import django
+        import os
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
+        if not django.apps.apps.ready:
+            django.setup()
+        
         from admin_panel.bd_models.models import Pack
         
         def fetch_pack():
@@ -288,6 +302,7 @@ async def get_pack_by_id(pack_id: int):
                     "cost": p.cost,
                     "description": p.description,
                     "emoji": p.emoji,
+                    "open_reward": p.open_reward,
                 }
             except Pack.DoesNotExist:
                 return None
@@ -371,46 +386,33 @@ async def log_transaction(discord_id: int, amount: int, reason: str):
         traceback.print_exc()
 
 
-async def get_economy_config():
-    """Get the global economy configuration"""
+async def award_coins_from_reward(discord_id: int, reward_type: str, context: str = "", ball_id: int = None, pack_id: int = None):
+    """Award coins to player - per-item customization"""
     try:
-        from admin_panel.bd_models.models import EconomyConfig
+        import django
+        import os
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
+        if not django.apps.apps.ready:
+            django.setup()
         
-        def fetch_config():
-            config, _ = EconomyConfig.objects.get_or_create(id=1)
-            return {
-                "starting_coins": config.starting_coins,
-                "catch_reward": config.catch_reward,
-                "pack_open_reward": config.pack_open_reward,
-                "trade_fee_percent": config.trade_fee_percent,
-            }
+        from admin_panel.bd_models.models import Ball, Pack
         
-        return await sync_to_async(fetch_config)()
-    except Exception as e:
-        print(f"Error fetching economy config: {e}")
-        return {
-            "starting_coins": 0,
-            "catch_reward": 0,
-            "pack_open_reward": 0,
-            "trade_fee_percent": 0.0,
-        }
-
-
-async def award_coins_from_reward(discord_id: int, reward_type: str, context: str = ""):
-    """Award coins to player based on economy config"""
-    try:
-        from admin_panel.bd_models.models import Player as DjangoPlayer
+        coin_amount = 0
         
-        # Get config
-        config = await get_economy_config()
+        # Get per-item customized reward
+        if reward_type == "catch" and ball_id:
+            try:
+                ball = await sync_to_async(lambda: Ball.objects.get(id=ball_id))()
+                coin_amount = ball.catch_reward
+            except:
+                coin_amount = 0
+        elif reward_type == "pack_open" and pack_id:
+            try:
+                pack = await sync_to_async(lambda: Pack.objects.get(id=pack_id))()
+                coin_amount = pack.open_reward
+            except:
+                coin_amount = 0
         
-        # Map reward type to config field
-        reward_map = {
-            "pack_open": config.get("pack_open_reward", 0),
-            "catch": config.get("catch_reward", 0),
-        }
-        
-        coin_amount = reward_map.get(reward_type, 0)
         if coin_amount <= 0:
             return
         

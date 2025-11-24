@@ -231,6 +231,7 @@ class Ball(models.Model):
     regime_id: int
     created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, editable=False)
     translations = models.TextField(blank=True, null=True)
+    catch_reward = models.BigIntegerField(default=0, help_text="Coins awarded for catching this NBA")
 
     def __str__(self) -> str:
         return self.country
@@ -432,6 +433,7 @@ class Pack(models.Model):
     description = models.TextField(default="", help_text="Description of pack contents")
     emoji = models.CharField(max_length=20, default="📦", help_text="Emoji for this pack")
     enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
+    open_reward = models.BigIntegerField(default=0, help_text="Coins awarded for opening this pack")
 
     def __str__(self) -> str:
         return f"{self.emoji} {self.name}"
@@ -502,28 +504,3 @@ class PackContent(models.Model):
         unique_together = ("pack", "ball_id")
 
 
-class EconomyConfig(models.Model):
-    """Global economy configuration (singleton)"""
-    name = models.CharField(max_length=64, default="Economy", help_text="Name of this configuration")
-    starting_coins = models.BigIntegerField(default=0, help_text="Coins players start with")
-    catch_reward = models.BigIntegerField(default=0, help_text="Coins awarded for catching an NBA")
-    pack_open_reward = models.BigIntegerField(default=0, help_text="Coins awarded for opening a pack")
-    trade_fee_percent = models.FloatField(default=0.0, help_text="Percentage fee on trades (0.0-1.0)")
-    
-    def __str__(self) -> str:
-        return self.name
-    
-    def save(self, *args, **kwargs):
-        # Keep this as singleton - only one config allowed
-        self.pk = 1
-        super().save(*args, **kwargs)
-    
-    def delete(self, *args, **kwargs):
-        # Prevent deletion of the only config
-        pass
-    
-    class Meta:
-        managed = False
-        db_table = "economyconfig"
-        verbose_name = "Economy Configuration"
-        verbose_name_plural = "Economy Configuration"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from ..models import Pack, CoinReward, CoinTransaction, PackContent, EconomyConfig
+from ..models import Pack, CoinReward, CoinTransaction, PackContent
 
 
 class PackContentInline(admin.TabularInline):
@@ -13,13 +13,17 @@ class PackContentInline(admin.TabularInline):
 
 @admin.register(Pack)
 class PackAdmin(admin.ModelAdmin):
-    list_display = ("emoji", "name", "cost", "enabled")
+    list_display = ("emoji", "name", "cost", "open_reward", "enabled")
     list_filter = ("enabled",)
     search_fields = ("name",)
     inlines = [PackContentInline]
     fieldsets = (
         ("Pack Information", {
             "fields": ("name", "emoji", "cost", "description", "enabled")
+        }),
+        ("Economy - Per Pack Customization", {
+            "fields": ("open_reward",),
+            "description": "Coins awarded to player when they open this pack"
         }),
     )
 
@@ -47,30 +51,6 @@ class CoinTransactionAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
-
-
-@admin.register(EconomyConfig)
-class EconomyConfigAdmin(admin.ModelAdmin):
-    list_display = ("name", "starting_coins", "catch_reward", "pack_open_reward")
-    fieldsets = (
-        ("Configuration", {
-            "fields": ("name",)
-        }),
-        ("Coin Rewards", {
-            "fields": ("starting_coins", "catch_reward", "pack_open_reward"),
-            "description": "All values are in coins. Configure your economy rewards here."
-        }),
-        ("Trading", {
-            "fields": ("trade_fee_percent",),
-            "description": "Fee as percentage (0.0 to 1.0, e.g., 0.1 = 10%)"
-        }),
-    )
-    
-    def has_add_permission(self, request):
-        return False
-    
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(PackContent)
