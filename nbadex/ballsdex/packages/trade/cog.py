@@ -515,3 +515,93 @@ class Trade(commands.GroupCog):
 
         source = TradeViewMenu(interaction, [trade.trader1, trade.trader2], self)
         await source.start(content="Select a user to view their proposal.")
+
+    # ===== COINS SUBGROUP =====
+    coins = app_commands.Group(name="coins", description="Add or remove coins in a trade")
+
+    @coins.command(description="Add coins to your trade proposal")
+    @app_commands.describe(amount="Amount of coins to add")
+    async def add_coins(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        amount: int,
+    ):
+        """Add coins to an ongoing trade."""
+        await interaction.response.defer(ephemeral=True)
+        try:
+            if amount <= 0:
+                await interaction.followup.send("Amount must be positive!", ephemeral=True)
+                return
+
+            trade, trader = self.get_trade(interaction)
+            if not trade or not trader:
+                await interaction.followup.send("You do not have an ongoing trade.", ephemeral=True)
+                return
+
+            if trader.locked:
+                await interaction.followup.send(
+                    "You have locked your proposal, it cannot be edited!",
+                    ephemeral=True,
+                )
+                return
+
+            # Add coins to trader's proposal (using extra_data)
+            if not hasattr(trader, "coins"):
+                trader.coins = 0
+            trader.coins += amount
+
+            embed = discord.Embed(
+                title="✅ Coins Added",
+                description=f"Added **{amount:,}** coins to your trade proposal",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"Error: {e}", ephemeral=True)
+
+    @coins.command(description="Remove coins from your trade proposal")
+    @app_commands.describe(amount="Amount of coins to remove")
+    async def remove_coins(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        amount: int,
+    ):
+        """Remove coins from an ongoing trade."""
+        await interaction.response.defer(ephemeral=True)
+        try:
+            if amount <= 0:
+                await interaction.followup.send("Amount must be positive!", ephemeral=True)
+                return
+
+            trade, trader = self.get_trade(interaction)
+            if not trade or not trader:
+                await interaction.followup.send("You do not have an ongoing trade.", ephemeral=True)
+                return
+
+            if trader.locked:
+                await interaction.followup.send(
+                    "You have locked your proposal, it cannot be edited!",
+                    ephemeral=True,
+                )
+                return
+
+            if not hasattr(trader, "coins"):
+                trader.coins = 0
+
+            if trader.coins < amount:
+                await interaction.followup.send(
+                    f"You only have {trader.coins:,} coins in this trade!",
+                    ephemeral=True,
+                )
+                return
+
+            trader.coins -= amount
+
+            embed = discord.Embed(
+                title="✅ Coins Removed",
+                description=f"Removed **{amount:,}** coins from your trade proposal",
+                color=discord.Color.green(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"Error: {e}", ephemeral=True)

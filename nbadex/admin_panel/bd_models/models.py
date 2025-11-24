@@ -430,7 +430,6 @@ class Pack(models.Model):
     name = models.CharField(max_length=255, help_text="Name of the pack")
     cost = models.IntegerField(default=0, help_text="Cost in coins to purchase this pack")
     description = models.TextField(default="", help_text="Description of pack contents")
-    emoji = models.CharField(max_length=10, default="📦", help_text="Emoji to display for this pack")
     enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
 
     def __str__(self) -> str:
