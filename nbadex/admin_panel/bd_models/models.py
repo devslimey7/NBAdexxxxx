@@ -231,6 +231,7 @@ class Ball(models.Model):
     regime_id: int
     created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, editable=False)
     translations = models.TextField(blank=True, null=True)
+    catch_reward = models.BigIntegerField(default=0, help_text="Coins awarded for catching this NBA")
 
     def __str__(self) -> str:
         return self.country
@@ -432,6 +433,7 @@ class Pack(models.Model):
     description = models.TextField(default="", help_text="Description of pack contents")
     emoji = models.CharField(max_length=20, default="📦", help_text="Emoji for this pack")
     enabled = models.BooleanField(default=True, help_text="Whether this pack can be purchased")
+    open_reward = models.BigIntegerField(default=0, help_text="Coins awarded for opening this pack")
 
     def __str__(self) -> str:
         return f"{self.emoji} {self.name}"
