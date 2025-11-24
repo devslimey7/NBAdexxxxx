@@ -83,14 +83,14 @@ class Packs(commands.Cog):
                 return
 
             total_cost = pack_obj.price * amount
-            if player.points < total_cost:
+            if player.coins < total_cost:
                 await interaction.followup.send(
-                    f"❌ Not enough points! Need {total_cost}, have {player.points}.",
+                    f"❌ Not enough points! Need {total_cost}, have {player.coins}.",
                     ephemeral=True,
                 )
                 return
 
-            player.points -= total_cost
+            player.coins -= total_cost
             await player.save()
 
             player_pack, created = await PlayerPack.get_or_create(player=player, pack=pack_obj)
@@ -104,7 +104,7 @@ class Packs(commands.Cog):
             emoji = pack_obj.emoji or "📦"
             await interaction.followup.send(
                 f"✅ Bought {amount}x {emoji} **{pack_obj.name}**!\n"
-                f"Spent {total_cost} points. Balance: {player.points}"
+                f"Spent {total_cost} points. Balance: {player.coins}"
             )
         except Exception as e:
             log.error(f"Error in packs buy: {e}")
