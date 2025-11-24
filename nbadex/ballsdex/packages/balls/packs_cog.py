@@ -5,7 +5,6 @@ from discord import app_commands
 from discord.ext import commands
 from ballsdex.core.models import Player, Ball, BallInstance
 from ballsdex.settings import settings
-from asgiref.sync import sync_to_async
 
 if False:
     from ballsdex.core.bot import BallsDexBot
@@ -309,15 +308,18 @@ async def get_pack_by_id(pack_id: int):
 async def get_user_pack_count(discord_id: int, pack_id: int):
     """Get count of packs owned by user"""
     try:
-        from admin_panel.bd_models.models import PlayerPack, Player as DjangoPlayer
+        from tortoise import Tortoise
         
-        def count_packs():
-            return PlayerPack.objects.filter(
-                player__discord_id=discord_id,
-                pack_id=pack_id
-            ).count()
-        
-        return await sync_to_async(count_packs)()
+        db = Tortoise.get_connection("default")
+        result = await db.execute_query(
+            """
+            SELECT COUNT(*) FROM playerpack pp
+            JOIN player p ON pp.player_id = p.id
+            WHERE p.discord_id = %s AND pp.pack_id = %s
+            """,
+            [discord_id, pack_id]
+        )
+        return result[0][0] if result else 0
     except Exception as e:
         print(f"Error counting packs: {e}")
         return 0
@@ -326,27 +328,31 @@ async def get_user_pack_count(discord_id: int, pack_id: int):
 async def get_user_packs(discord_id: int):
     """Get all packs owned by user"""
     try:
-        from admin_panel.bd_models.models import PlayerPack
-        from django.db.models import Count
+        from tortoise import Tortoise
         
-        def fetch_user_packs():
-            packs_list = []
-            packs_qs = PlayerPack.objects.filter(
-                player__discord_id=discord_id
-            ).values("pack__name", "pack__cost", "pack__emoji").annotate(
-                count=Count("id")
-            ).order_by("pack__name")
-            
-            for p in packs_qs:
-                packs_list.append({
-                    "name": p["pack__name"],
-                    "cost": p["pack__cost"],
-                    "count": p["count"],
-                    "emoji": p["pack__emoji"],
-                })
-            return packs_list
+        db = Tortoise.get_connection("default")
+        result = await db.execute_query(
+            """
+            SELECT p.name, p.cost, p.emoji, COUNT(pp.id) as count
+            FROM playerpack pp
+            JOIN player pl ON pp.player_id = pl.id
+            JOIN pack p ON pp.pack_id = p.id
+            WHERE pl.discord_id = %s
+            GROUP BY p.id, p.name, p.cost, p.emoji
+            ORDER BY p.name
+            """,
+            [discord_id]
+        )
         
-        return await sync_to_async(fetch_user_packs)()
+        packs_list = []
+        for row in result:
+            packs_list.append({
+                "name": row[0],
+                "cost": row[1],
+                "emoji": row[2],
+                "count": row[3],
+            })
+        return packs_list
     except Exception as e:
         print(f"Error fetching user packs: {e}")
         import traceback
@@ -357,20 +363,29 @@ async def get_user_packs(discord_id: int):
 async def log_transaction(discord_id: int, amount: int, reason: str):
     """Log a coin transaction"""
     try:
-        from admin_panel.bd_models.models import CoinTransaction, Player as DjangoPlayer
+        from tortoise import Tortoise
         
-        def create_transaction():
-            try:
-                player = DjangoPlayer.objects.get(discord_id=discord_id)
-                CoinTransaction.objects.create(
-                    player=player,
-                    amount=amount,
-                    reason=reason
-                )
-            except DjangoPlayer.DoesNotExist:
-                print(f"Player not found for discord_id {discord_id}")
+        db = Tortoise.get_connection("default")
+        # Get player ID from discord_id
+        result = await db.execute_query(
+            "SELECT id FROM player WHERE discord_id = %s",
+            [discord_id]
+        )
         
-        await sync_to_async(create_transaction)()
+        if not result:
+            print(f"Player not found for discord_id {discord_id}")
+            return
+        
+        player_id = result[0][0]
+        
+        # Insert transaction
+        await db.execute_query(
+            """
+            INSERT INTO cointransaction (player_id, amount, reason, timestamp)
+            VALUES (%s, %s, %s, NOW())
+            """,
+            [player_id, amount, reason]
+        )
     except Exception as e:
         print(f"Error logging transaction: {e}")
         import traceback
@@ -412,15 +427,21 @@ async def award_coins_from_reward(discord_id: int, reward_type: str, context: st
 async def get_pack_contents(pack_id: int):
     """Get all NBAs in a pack with their rarity"""
     try:
-        from bd_models.models import PackContent
-
-        def fetch_contents():
-            contents = list(
-                PackContent.objects.filter(pack_id=pack_id).values("ball_id", "rarity")
-            )
-            return contents
-
-        return await sync_to_async(fetch_contents)()
+        from tortoise import Tortoise
+        
+        db = Tortoise.get_connection("default")
+        result = await db.execute_query(
+            "SELECT ball_id, rarity FROM packcontent WHERE pack_id = %s",
+            [pack_id]
+        )
+        
+        contents = []
+        for row in result:
+            contents.append({
+                "ball_id": row[0],
+                "rarity": row[1]
+            })
+        return contents
     except Exception as e:
         print(f"Error fetching pack contents: {e}")
         return []
