@@ -34,7 +34,16 @@ class PacksCommands(commands.Cog):
     packs = app_commands.Group(name="packs", description="Pack shop")
 
     @packs.command(description="List all packs")
-    async def list(self, interaction: discord.Interaction["BallsDexBot"]):
+    @app_commands.describe(
+        sorting="Sort by: name, cost (default: name)",
+        reverse="Reverse sort order",
+    )
+    async def list(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        sorting: str = "name",
+        reverse: bool = False,
+    ):
         """List all available packs"""
         await interaction.response.defer()
         try:
@@ -42,6 +51,12 @@ class PacksCommands(commands.Cog):
             if not packs:
                 await interaction.followup.send("No packs available!")
                 return
+
+            # Sort packs
+            if sorting == "cost":
+                packs = sorted(packs, key=lambda p: p["cost"], reverse=reverse)
+            else:  # default: name
+                packs = sorted(packs, key=lambda p: p["name"], reverse=reverse)
 
             embed = discord.Embed(title="📦 Available Packs", color=discord.Color.blue())
             for pack in packs:
@@ -58,16 +73,24 @@ class PacksCommands(commands.Cog):
             await interaction.followup.send(f"Error: {e}")
 
     @packs.command(description="Buy a pack with coins")
-    @app_commands.describe(pack="The pack to buy")
+    @app_commands.describe(
+        pack="The pack to buy",
+        amount="Number of packs to buy (default: 1)",
+    )
     @app_commands.autocomplete(pack=pack_autocomplete)
     async def buy(
         self,
         interaction: discord.Interaction["BallsDexBot"],
         pack: str,
+        amount: int = 1,
     ):
         """Buy a pack"""
         await interaction.response.defer(ephemeral=True)
         try:
+            if amount <= 0:
+                await interaction.followup.send("Amount must be at least 1!", ephemeral=True)
+                return
+
             pack_id = int(pack)
             pack_data = await get_pack_by_id(pack_id)
             
@@ -76,26 +99,27 @@ class PacksCommands(commands.Cog):
                 return
 
             player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            total_cost = pack_data["cost"] * amount
 
-            if player.coins < pack_data["cost"]:
+            if player.coins < total_cost:
                 await interaction.followup.send(
-                    f"You don't have enough points to buy 1 pack, you need {pack_data['cost'] - player.coins} more points.",
+                    f"You don't have enough points to buy {amount} pack(s), you need {total_cost - player.coins} more points.",
                     ephemeral=True,
                 )
                 return
 
-            player.coins -= pack_data["cost"]
+            player.coins -= total_cost
             await player.save()
 
             await log_transaction(
                 interaction.user.id,
-                -pack_data["cost"],
-                f"Pack purchase: {pack_data['name']}",
+                -total_cost,
+                f"Pack purchase: {amount}x {pack_data['name']}",
             )
 
             embed = discord.Embed(
                 title="✅ Pack Purchased!",
-                description=f"You have successfully bought 1x {pack_data['emoji']} **{pack_data['name']}** pack!",
+                description=f"You have successfully bought {amount}x {pack_data['emoji']} **{pack_data['name']}** pack(s)!",
                 color=discord.Color.green(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -130,6 +154,7 @@ class PacksCommands(commands.Cog):
     @app_commands.describe(
         user="The user to give the pack to",
         pack="The pack to give",
+        amount="Number of packs to give (default: 1)",
     )
     @app_commands.autocomplete(pack=pack_autocomplete)
     async def give(
@@ -137,10 +162,15 @@ class PacksCommands(commands.Cog):
         interaction: discord.Interaction["BallsDexBot"],
         user: discord.User,
         pack: str,
+        amount: int = 1,
     ):
         """Give a pack to another player"""
         await interaction.response.defer(ephemeral=True)
         try:
+            if amount <= 0:
+                await interaction.followup.send("Amount must be at least 1!", ephemeral=True)
+                return
+
             pack_id = int(pack)
             pack_data = await get_pack_by_id(pack_id)
             
@@ -148,7 +178,7 @@ class PacksCommands(commands.Cog):
                 await interaction.followup.send("Pack not found!", ephemeral=True)
                 return
 
-            await interaction.followup.send("Pack gifting coming soon!", ephemeral=True)
+            await interaction.followup.send(f"Pack gifting {amount}x packs coming soon!", ephemeral=True)
         except ValueError:
             await interaction.followup.send("Invalid pack!", ephemeral=True)
         except Exception as e:

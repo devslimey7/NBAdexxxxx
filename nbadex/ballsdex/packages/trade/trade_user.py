@@ -19,6 +19,7 @@ class TradingUser:
     cancelled: bool = False
     accepted: bool = False
     blacklisted: bool | None = None
+    coins: int = 0
 
     @classmethod
     async def from_trade_model(

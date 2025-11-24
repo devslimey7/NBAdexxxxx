@@ -545,9 +545,7 @@ class Trade(commands.GroupCog):
                 )
                 return
 
-            # Add coins to trader's proposal (using extra_data)
-            if not hasattr(trader, "coins"):
-                trader.coins = 0
+            # Add coins to trader's proposal
             trader.coins += amount
 
             embed = discord.Embed(
@@ -584,9 +582,6 @@ class Trade(commands.GroupCog):
                     ephemeral=True,
                 )
                 return
-
-            if not hasattr(trader, "coins"):
-                trader.coins = 0
 
             if trader.coins < amount:
                 await interaction.followup.send(

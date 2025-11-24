@@ -26,11 +26,11 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - `/trade coins add` - Add coins to trade proposal
   - `/trade coins remove` - Remove coins from trade proposal
 - **Discord Commands - Packs** (PacksCommands cog with autocomplete):
-  - `/packs list` - List all available packs with ownership count
-  - `/packs buy pack:` - Buy a pack with autocomplete selection and cost confirmation
+  - `/packs list [sorting] [reverse]` - List packs with optional sort by name/cost and reverse order
+  - `/packs buy pack: [amount]` - Buy packs (autocomplete selection, optional quantity)
   - `/packs inventory` - View your owned packs
-  - `/packs give user: pack:` - Give pack to another player
-  - `/packs open pack:` - Open a pack from inventory
+  - `/packs give user: pack: [amount]` - Give pack to another player (autocomplete, optional quantity)
+  - `/packs open pack: [ephemeral]` - Open a pack from inventory (autocomplete, optional visibility)
 - **Admin Panel Integration** ✅ Fully Working:
   - Pack management: Create/edit packs with full control
   - CoinReward inline editing within pack editor
