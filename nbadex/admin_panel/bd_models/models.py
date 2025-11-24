@@ -471,6 +471,21 @@ class CoinTransaction(models.Model):
         db_table = "cointransaction"
 
 
+class PlayerPack(models.Model):
+    """Track packs owned by players"""
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="owned_packs")
+    player_id: int
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="owners")
+    pack_id: int
+
+    def __str__(self) -> str:
+        return f"{self.player.discord_id} owns {self.pack.name}"
+
+    class Meta:
+        managed = False
+        db_table = "player_pack"
+
+
 class PackContent(models.Model):
     """NBAs that can be obtained from a pack with their rarity"""
     pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="contents")
