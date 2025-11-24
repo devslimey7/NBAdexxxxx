@@ -5,36 +5,35 @@ from django.contrib import admin
 from ..models import Pack, CoinReward, CoinTransaction
 
 
-class CoinRewardInline(admin.TabularInline):
-    model = CoinReward
-    extra = 1
-    fields = ("amount", "probability", "description")
-
-
 @admin.register(Pack)
 class PackAdmin(admin.ModelAdmin):
-    list_display = ("emoji", "name", "cost", "enabled", "updated_at")
-    list_filter = ("enabled", "created_at")
+    list_display = ("name", "cost", "enabled")
+    list_filter = ("enabled",)
     search_fields = ("name",)
-    inlines = [CoinRewardInline]
     fieldsets = (
         ("Pack Information", {
-            "fields": ("name", "emoji", "cost", "description", "enabled")
-        }),
-        ("Timestamps", {
-            "fields": ("created_at", "updated_at"),
-            "classes": ("collapse",)
+            "fields": ("name", "cost", "description", "enabled")
         }),
     )
-    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(CoinReward)
+class CoinRewardAdmin(admin.ModelAdmin):
+    list_display = ("name", "base_coins")
+    search_fields = ("name",)
+    fieldsets = (
+        ("Reward Information", {
+            "fields": ("name", "base_coins", "description")
+        }),
+    )
 
 
 @admin.register(CoinTransaction)
 class CoinTransactionAdmin(admin.ModelAdmin):
-    list_display = ("player", "amount", "reason", "created_at")
-    list_filter = ("created_at", "reason")
-    search_fields = ("player__discord_id",)
-    readonly_fields = ("player", "amount", "reason", "pack", "created_at")
+    list_display = ("player", "amount", "reason", "timestamp")
+    list_filter = ("timestamp", "reason")
+    search_fields = ("player__discord_id", "reason")
+    readonly_fields = ("player", "amount", "reason", "timestamp")
     
     def has_add_permission(self, request):
         return False
