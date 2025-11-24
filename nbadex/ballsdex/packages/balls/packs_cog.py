@@ -1,8 +1,9 @@
 """Packs shop with autocomplete for Discord bot"""
 import discord
+import random
 from discord import app_commands
 from discord.ext import commands
-from ballsdex.core.models import Player
+from ballsdex.core.models import Player, Ball, BallInstance
 from ballsdex.settings import settings
 from asgiref.sync import sync_to_async
 
@@ -206,7 +207,41 @@ class PacksCommands(commands.Cog):
                 await interaction.followup.send("Pack not found!", ephemeral=True)
                 return
 
-            await interaction.followup.send("Pack opening coming soon!", ephemeral=ephemeral)
+            # Get player
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            # Draw an NBA from the pack based on rarity
+            ball_instance = await draw_ball_from_pack(pack_id, player)
+            if not ball_instance:
+                await interaction.followup.send(
+                    f"Pack contains no available NBAs!", ephemeral=True
+                )
+                return
+            
+            # Award coins for opening the pack
+            await award_coins_from_reward(interaction.user.id, "pack_open", pack_data["name"])
+            
+            # Get ball name for message
+            ball_name = ball_instance.ball.country
+            emoji = interaction.client.get_emoji(ball_instance.ball.emoji_id)
+            
+            embed = discord.Embed(
+                title="🎉 Pack Opened!",
+                description=f"You found: {emoji} **{ball_name}**!",
+                color=discord.Color.green()
+            )
+            embed.add_field(
+                name="Stats",
+                value=f"HP: {ball_instance.hp} | ATK: {ball_instance.attack}",
+                inline=False
+            )
+            embed.add_field(
+                name="Bonus",
+                value=f"💰 Coins awarded for opening pack!",
+                inline=False
+            )
+            
+            await interaction.followup.send(embed=embed, ephemeral=ephemeral)
         except ValueError:
             await interaction.followup.send("Invalid pack!", ephemeral=True)
         except Exception as e:
@@ -321,6 +356,92 @@ async def log_transaction(discord_id: int, amount: int, reason: str):
         await sync_to_async(create_transaction)()
     except Exception as e:
         print(f"Error logging transaction: {e}")
+
+
+async def get_coin_reward(reward_name: str) -> int:
+    """Get coin reward amount from database"""
+    try:
+        from bd_models.models import CoinReward
+
+        def fetch_reward():
+            reward = CoinReward.objects.get(name=reward_name)
+            return reward.base_coins
+
+        return await sync_to_async(fetch_reward)()
+    except Exception as e:
+        print(f"Error fetching reward '{reward_name}': {e}")
+        return 0
+
+
+async def award_coins_from_reward(discord_id: int, reward_name: str, context: str = ""):
+    """Award coins to player based on CoinReward and log transaction"""
+    try:
+        from bd_models.models import Player as DjangoPlayer
+        
+        # Get reward amount from database
+        coin_amount = await get_coin_reward(reward_name)
+        if coin_amount <= 0:
+            return
+        
+        # Update player coins in Tortoise
+        player, _ = await Player.get_or_create(discord_id=discord_id)
+        player.coins += coin_amount
+        await player.save(update_fields=("coins",))
+        
+        # Log transaction
+        reason = f"{reward_name}: {context}" if context else reward_name
+        await log_transaction(discord_id, coin_amount, reason)
+        
+    except Exception as e:
+        print(f"Error awarding coins: {e}")
+
+
+async def get_pack_contents(pack_id: int):
+    """Get all NBAs in a pack with their rarity"""
+    try:
+        from bd_models.models import PackContent
+
+        def fetch_contents():
+            contents = list(
+                PackContent.objects.filter(pack_id=pack_id).values("ball_id", "rarity")
+            )
+            return contents
+
+        return await sync_to_async(fetch_contents)()
+    except Exception as e:
+        print(f"Error fetching pack contents: {e}")
+        return []
+
+
+async def draw_ball_from_pack(pack_id: int, player: Player) -> BallInstance | None:
+    """Draw a random NBA from pack based on rarity and create BallInstance"""
+    try:
+        # Get pack contents
+        contents = await get_pack_contents(pack_id)
+        if not contents:
+            return None
+        
+        # Weight-based random selection based on rarity
+        ball_ids = [c["ball_id"] for c in contents]
+        weights = [c["rarity"] for c in contents]
+        
+        selected_ball_id = random.choices(ball_ids, weights=weights, k=1)[0]
+        
+        # Get the Ball model
+        ball = await Ball.get(id=selected_ball_id)
+        
+        # Create BallInstance for the player
+        ball_instance = await BallInstance.create(
+            player=player,
+            ball=ball,
+            hp=ball.health,
+            attack=ball.attack,
+        )
+        
+        return ball_instance
+    except Exception as e:
+        print(f"Error drawing ball from pack: {e}")
+        return None
 
 
 async def setup(bot: "BallsDexBot"):
