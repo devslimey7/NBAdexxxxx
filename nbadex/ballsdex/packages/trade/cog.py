@@ -182,8 +182,8 @@ class Trade(commands.GroupCog):
                 "You cannot trade with yourself.", ephemeral=True
             )
             return
-        player1, _ = await Player.get_or_create(discord_id=interaction.user.id)
-        player2, _ = await Player.get_or_create(discord_id=user.id)
+        player1, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
+        player2, _ = await Player.get_or_create(discord_id=user.id, coins=0)
         blocked = await player1.is_blocked(player2)
         if blocked:
             await interaction.response.send_message(
@@ -210,8 +210,8 @@ class Trade(commands.GroupCog):
             )
             return
 
-        player1, _ = await Player.get_or_create(discord_id=interaction.user.id)
-        player2, _ = await Player.get_or_create(discord_id=user.id)
+        player1, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
+        player2, _ = await Player.get_or_create(discord_id=user.id, coins=0)
         if player2.discord_id in self.bot.blacklist:
             await interaction.response.send_message(
                 "You cannot trade with a blacklisted user.", ephemeral=True

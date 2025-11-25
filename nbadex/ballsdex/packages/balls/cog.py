@@ -172,7 +172,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             if await inventory_privacy(self.bot, interaction, player, user_obj) is False:
                 return
 
-        interaction_player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        interaction_player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
 
         blocked = await player.is_blocked(interaction_player)
         if blocked and not is_staff(interaction):
@@ -262,7 +262,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 )
                 return
 
-            interaction_player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            interaction_player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
 
             blocked = await player.is_blocked(interaction_player)
             if blocked and not is_staff(interaction):
@@ -426,7 +426,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             if await inventory_privacy(self.bot, interaction, player, user_obj) is False:
                 return
 
-        interaction_player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        interaction_player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
 
         blocked = await player.is_blocked(interaction_player)
         if blocked and not is_staff(interaction):
@@ -578,7 +578,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         else:
             await interaction.response.defer()
         await countryball.lock_for_trade()
-        new_player, _ = await Player.get_or_create(discord_id=user.id)
+        new_player, _ = await Player.get_or_create(discord_id=user.id, coins=0)
         old_player = countryball.player
 
         if new_player == old_player:
@@ -718,7 +718,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         """
         await interaction.response.defer(thinking=True, ephemeral=True)
 
-        player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
         is_special = type == DuplicateType.specials
         queryset = BallInstance.filter(player=player)
 
@@ -803,8 +803,8 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 if y.enabled and (special.end_date is None or y.created_at < special.end_date)
             }
 
-        player1, _ = await Player.get_or_create(discord_id=interaction.user.id)
-        player2, _ = await Player.get_or_create(discord_id=user.id)
+        player1, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
+        player2, _ = await Player.get_or_create(discord_id=user.id, coins=0)
 
         blocked = await player.is_blocked(player1)
         if blocked and not is_staff(interaction):
@@ -900,7 +900,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             Whether or not to send the command ephemerally.
         """
         await interaction.response.defer(thinking=True, ephemeral=ephemeral)
-        player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
 
         query = (
             BallInstance.filter(player=player)
@@ -1150,7 +1150,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             log.info("Claim command started")
             
             # Get or create player
-            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
             now = datetime.now()
             
             log.info(f"Player {interaction.user.id} attempting claim")

@@ -29,7 +29,7 @@ async def inventory_privacy(
     user_obj: Union[discord.User, discord.Member],
 ):
     privacy_policy = player.privacy_policy
-    interacting_player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+    interacting_player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
     if interaction.user.id == player.discord_id:
         return True
     if is_staff(interaction):
