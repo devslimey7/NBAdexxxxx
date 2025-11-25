@@ -59,7 +59,7 @@ class CountryballNamePrompt(Modal, title=f"Catch this {settings.collectible_name
     async def on_submit(self, interaction: discord.Interaction["BallsDexBot"]):
         await interaction.response.defer(thinking=True)
 
-        player, _ = await Player.get_or_create(discord_id=interaction.user.id, coins=0)
+        player, _ = await Player.get_or_create(discord_id=interaction.user.id)
         if self.view.caught:
             slow_message = random.choice(settings.slow_messages).format(
                 user=interaction.user.mention,
@@ -349,7 +349,7 @@ class BallSpawnView(View):
             raise RuntimeError("This ball was already caught!")
         self.caught = True
         self.catch_button.disabled = True
-        player = player or (await Player.get_or_create(discord_id=user.id, coins=0))[0]
+        player = player or (await Player.get_or_create(discord_id=user.id))[0]
         is_new = not await BallInstance.filter(player=player, ball=self.model).exists()
 
         if self.ballinstance:

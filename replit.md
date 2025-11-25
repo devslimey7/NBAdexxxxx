@@ -10,8 +10,16 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
 
-# Recent Changes (Session: Nov 24, 2025)
+# Recent Changes (Session: Nov 25, 2025)
 
+- **COMPLETE REMOVAL OF COINS SYSTEM**: Dropped `coins` column from database and removed all economy-related code
+  - Fixed database integrity constraint violation (NOT NULL on coins field)
+  - Removed all `coins=0` workarounds from 18 Player.get_or_create() calls across codebase
+  - Bot now creates players without any economy field dependencies
+  - This prevents the issue from ever happening again
+- Bot running with 27 NBAs loaded and fully operational
+
+## Previous Session (Nov 24, 2025)
 - Removed economy system (coins, packs, CoinReward, CoinTransaction) - not needed
 - Bot and admin panel running smoothly with all core features
 
@@ -24,6 +32,7 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 Preferred communication style: Simple, everyday language.
 Deployment: Production-grade server (Gunicorn), not development server.
+Database Management: Clean up unused fields and systems entirely rather than using workarounds.
 
 # System Architecture
 

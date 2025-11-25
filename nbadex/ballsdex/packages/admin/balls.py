@@ -234,7 +234,7 @@ class Balls(app_commands.Group):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        player, created = await Player.get_or_create(discord_id=user.id, coins=0)
+        player, created = await Player.get_or_create(discord_id=user.id)
         instance = await BallInstance.create(
             ball=countryball,
             player=player,
@@ -407,7 +407,7 @@ class Balls(app_commands.Group):
                 f"The {settings.collectible_name} ID you gave does not exist.", ephemeral=True
             )
             return
-        player, _ = await Player.get_or_create(discord_id=user.id, coins=0)
+        player, _ = await Player.get_or_create(discord_id=user.id)
         ball.player = player
         await ball.save()
 
