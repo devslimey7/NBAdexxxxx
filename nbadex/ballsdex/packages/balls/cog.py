@@ -1292,15 +1292,13 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 class RarityPageSource(FieldPageSource):
     """Custom page source for rarity list with pagination."""
 
-    async def format_page(self, menu: Pages, page: int) -> discord.Embed:
-        entries = await self.get_page(page)
-        
+    async def format_page(self, menu: Pages, entries: list) -> discord.Embed:
         embed = discord.Embed(
             title="🏀 Rarity List",
             color=0x3498db
         )
         
-        # Join all entries with newline
+        # Join all entries with newline (entries are tuples of (name, ""))
         rarity_text = "\n".join([entry[0] for entry in entries])
         embed.description = rarity_text
 
