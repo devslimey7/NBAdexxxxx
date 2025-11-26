@@ -1277,10 +1277,9 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 entries.append((entry_text, ""))
 
             # Create page source with proper pagination
-            source = RarityPageSource(entries, per_page=15)
+            source = RarityPageSource(entries, per_page=10)
             pages = Pages(source, interaction=interaction, compact=False)
-            
-            await pages.send(embed=await source.format_page(pages, entries[:15]))
+            await pages.start()
 
         except Exception as e:
             log.error(f"Error in rarity command: {e}")
@@ -1291,15 +1290,17 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 
 
 class RarityPageSource(FieldPageSource):
-    """Custom page source for rarity list."""
+    """Custom page source for rarity list with pagination."""
 
-    async def format_page(self, menu: Pages, entries: list[tuple[str, str]]) -> discord.Embed:
+    async def format_page(self, menu: Pages, page: int) -> discord.Embed:
+        entries = await self.get_page(page)
+        
         embed = discord.Embed(
             title="🏀 Rarity List",
             color=0x3498db
         )
         
-        # Join all entries with newline, ignore empty values
+        # Join all entries with newline
         rarity_text = "\n".join([entry[0] for entry in entries])
         embed.description = rarity_text
 
