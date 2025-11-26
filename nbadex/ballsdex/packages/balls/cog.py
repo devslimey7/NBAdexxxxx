@@ -1255,7 +1255,8 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         await interaction.response.defer(thinking=True)
 
         try:
-            # Get all enabled balls sorted by rarity ascending, then by name alphabetically for ties
+            # Get all enabled balls and sort by rarity (ascending = rarest first)
+            # When rarities are equal, sort alphabetically by name for consistency
             all_balls = sorted(
                 [b for b in balls.values() if b.enabled],
                 key=lambda x: (x.rarity, x.country)
@@ -1268,33 +1269,24 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 )
                 return
 
-            # Create entries with rank, name, and emoji
-            # Rank system: rank = position where that rarity value first appears
+            # Create entries with correct ranking
+            # Ranking rule: players at position N with a NEW rarity get rank N
+            # Players at positions N+1, N+2, etc with the SAME rarity keep rank N
+            # Next player with a DIFFERENT rarity gets their position as rank
             entries = []
-            rank_counter = None
-            prev_rarity = None
+            current_rank = 1
+            previous_rarity = None
             
-            # Debug: log the first items around positions 36-40
-            debug_output = []
-            
-            for idx, ball in enumerate(all_balls, 1):
-                # Set rank to current position when we encounter a new rarity OR at the start
-                if rank_counter is None or ball.rarity != prev_rarity:
-                    rank_counter = idx
-                
-                # Log debug info for positions around 36-40
-                if 35 <= idx <= 42:
-                    debug_output.append(f"idx={idx}, name={ball.country}, rarity={ball.rarity}, rank={rank_counter}, prev_rarity={prev_rarity}")
+            for position, ball in enumerate(all_balls, 1):
+                # When rarity changes, update rank to current position
+                if previous_rarity is not None and ball.rarity != previous_rarity:
+                    current_rank = position
                 
                 emoji = self.bot.get_emoji(ball.emoji_id)
                 emoji_str = str(emoji) if emoji else "❓"
-                entry_text = f"{rank_counter}. {ball.country} {emoji_str}"
+                entry_text = f"{current_rank}. {ball.country} {emoji_str}"
                 entries.append((entry_text, ""))
-                prev_rarity = ball.rarity
-            
-            # Log debug info
-            for line in debug_output:
-                log.info(line)
+                previous_rarity = ball.rarity
 
             # Create page source with proper pagination
             source = RarityPageSource(entries, per_page=10)
