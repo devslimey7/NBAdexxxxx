@@ -1255,10 +1255,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         await interaction.response.defer(thinking=True)
 
         try:
-            # Get all enabled balls sorted by rarity ascending (lowest/rarest first)
+            # Get all enabled balls sorted by rarity ascending, then by name alphabetically for ties
             all_balls = sorted(
                 [b for b in balls.values() if b.enabled],
-                key=lambda x: x.rarity
+                key=lambda x: (x.rarity, x.country)
             )
 
             if not all_balls:
