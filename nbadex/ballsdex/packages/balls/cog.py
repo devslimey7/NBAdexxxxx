@@ -1255,12 +1255,10 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         await interaction.response.defer(thinking=True)
 
         try:
-            # Get all enabled balls and sort by rarity (ascending = rarest first)
-            # When rarities are equal, sort alphabetically by name for consistency
-            all_balls = sorted(
-                [b for b in balls.values() if b.enabled],
-                key=lambda x: (x.rarity, x.country)
-            )
+            # Query database directly for fresh rarity data (not the cached balls dict)
+            # This ensures any admin panel changes are reflected immediately
+            db_balls = await Ball.filter(enabled=True).order_by("rarity", "country")
+            all_balls = db_balls
 
             if not all_balls:
                 await interaction.followup.send(
