@@ -1269,24 +1269,21 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 return
 
             # Create entries with rank, name, and emoji
-            # Map unique rarity values to rank numbers
+            # Rank system: position in list determines rank (same rarity = same rank)
             entries = []
-            rarity_to_rank = {}
-            current_rank = 1
+            rank_counter = 1
+            prev_rarity = None
             
-            for ball in all_balls:
-                # Assign rank number the first time we see each unique rarity value
-                if ball.rarity not in rarity_to_rank:
-                    rarity_to_rank[ball.rarity] = current_rank
-                    current_rank += 1
-            
-            # Now create the entries with the correct rank numbers
-            for ball in all_balls:
-                rank = rarity_to_rank[ball.rarity]
+            for idx, ball in enumerate(all_balls, 1):
+                # When rarity changes, update rank counter to current position
+                if prev_rarity is not None and ball.rarity != prev_rarity:
+                    rank_counter = idx
+                
                 emoji = self.bot.get_emoji(ball.emoji_id)
                 emoji_str = str(emoji) if emoji else "❓"
-                entry_text = f"{rank}. {ball.country} {emoji_str}"
+                entry_text = f"{rank_counter}. {ball.country} {emoji_str}"
                 entries.append((entry_text, ""))
+                prev_rarity = ball.rarity
 
             # Create page source with proper pagination
             source = RarityPageSource(entries, per_page=10)
