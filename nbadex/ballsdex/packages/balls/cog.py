@@ -1246,3 +1246,66 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 "An error occurred while claiming your daily reward.",
                 ephemeral=True,
             )
+
+    @app_commands.command()
+    async def rarity(self, interaction: discord.Interaction["BallsDexBot"]):
+        """
+        Display all NBAs ranked by rarity.
+        """
+        await interaction.response.defer(thinking=True)
+
+        try:
+            # Get all enabled balls sorted by rarity descending
+            all_balls = sorted(
+                [b for b in balls.values() if b.enabled],
+                key=lambda x: x.rarity,
+                reverse=True
+            )
+
+            if not all_balls:
+                await interaction.followup.send(
+                    "No NBAs available to display.",
+                    ephemeral=True,
+                )
+                return
+
+            # Create entries with rank, name, and emoji
+            entries = []
+            for idx, ball in enumerate(all_balls, 1):
+                emoji = self.bot.get_emoji(ball.emoji_id)
+                emoji_str = str(emoji) if emoji else "❓"
+                entry_text = f"{idx}. {ball.country} {emoji_str}"
+                entries.append((entry_text, f"Rarity: {ball.rarity:.2f}"))
+
+            # Create custom page source
+            source = RarityPageSource(entries, per_page=10)
+            pages = Pages(source, interaction=interaction, compact=False)
+            
+            await pages.send(embed=await source.format_page(pages, entries[:10]))
+
+        except Exception as e:
+            log.error(f"Error in rarity command: {e}")
+            await interaction.followup.send(
+                "An error occurred while fetching the rarity list.",
+                ephemeral=True,
+            )
+
+
+class RarityPageSource(FieldPageSource):
+    """Custom page source for rarity list with enhanced formatting."""
+
+    async def format_page(self, menu: Pages, entries: list[tuple[str, str]]) -> discord.Embed:
+        self.embed.clear_fields()
+        self.embed.title = "📊 Rarity List"
+        self.embed.description = None
+        self.embed.color = 0x3498db
+
+        rarity_text = "\n".join([entry[0] for entry in entries])
+        self.embed.add_field(name="NBA Rankings", value=rarity_text, inline=False)
+
+        maximum = self.get_max_pages()
+        if maximum > 1:
+            text = f"Page {menu.current_page + 1}/{maximum}"
+            self.embed.set_footer(text=text)
+
+        return self.embed
