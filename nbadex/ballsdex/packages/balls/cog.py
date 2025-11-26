@@ -1269,14 +1269,14 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 return
 
             # Create entries with rank, name, and emoji
-            # Rank system: position in list determines rank (same rarity = same rank)
+            # Rank system: rank = position where that rarity value first appears
             entries = []
-            rank_counter = 1
+            rank_counter = None
             prev_rarity = None
             
             for idx, ball in enumerate(all_balls, 1):
-                # When rarity changes, update rank counter to current position
-                if prev_rarity is not None and ball.rarity != prev_rarity:
+                # Set rank to current position when we encounter a new rarity OR at the start
+                if rank_counter is None or ball.rarity != prev_rarity:
                     rank_counter = idx
                 
                 emoji = self.bot.get_emoji(ball.emoji_id)
