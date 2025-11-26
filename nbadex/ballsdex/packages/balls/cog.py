@@ -1294,9 +1294,12 @@ class RarityPageSource(FieldPageSource):
 
     async def format_page(self, menu: Pages, entries: list) -> discord.Embed:
         embed = discord.Embed(
-            title="🏀 Rarity List",
+            title="Rarity List",
             color=0x3498db
         )
+        
+        # Add bot avatar as thumbnail
+        embed.set_thumbnail(url=menu.bot.user.avatar.url)
         
         # Join all entries with newline (entries are tuples of (name, ""))
         rarity_text = "\n".join([entry[0] for entry in entries])
