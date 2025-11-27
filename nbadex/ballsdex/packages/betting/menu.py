@@ -393,12 +393,12 @@ class BallsSelector(Pages):
     async def set_options(self, balls: AsyncIterator[BallInstance]):
         options: List[discord.SelectOption] = []
         async for ball in balls:
-            emoji = self.bot.get_emoji(int(ball.ball.emoji_id))
+            emoji = self.bot.get_emoji(int(ball.countryball.emoji_id))
             favorite = f"{settings.favorited_collectible_emoji} " if ball.favorite else ""
             special = ball.special_emoji(self.bot, True)
             options.append(
                 discord.SelectOption(
-                    label=f"{favorite}{special}#{ball.pk:0X} {ball.ball.country}",
+                    label=f"{favorite}{special}#{ball.pk:0X} {ball.countryball.country}",
                     description=f"ATK: {ball.attack_bonus:+d}% • HP: {ball.health_bonus:+d}% • "
                     f"Caught on {ball.catch_date.strftime('%d/%m/%y %H:%M')}",
                     emoji=emoji,
@@ -415,7 +415,7 @@ class BallsSelector(Pages):
     ):
         for value in item.values:
             ball_instance = await BallInstance.get(id=int(value)).prefetch_related(
-                "ball", "player"
+                "countryball", "player"
             )
             self.balls_selected.add(ball_instance)
         await interaction.response.defer()
@@ -427,7 +427,7 @@ class BallsSelector(Pages):
         await interaction.response.defer(thinking=True, ephemeral=True)
         for ball in self.select_ball_menu.options:
             ball_instance = await BallInstance.get(id=int(ball.value)).prefetch_related(
-                "ball", "player"
+                "countryball", "player"
             )
             if ball_instance not in self.balls_selected:
                 self.balls_selected.add(ball_instance)
