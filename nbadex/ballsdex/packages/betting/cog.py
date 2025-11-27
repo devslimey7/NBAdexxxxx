@@ -86,7 +86,6 @@ class Bet(commands.GroupCog):
             bet = await BetModel.create(
                 player1=player1,
                 player2=player2,
-                started_at=discord.utils.utcnow(),
             )
             self.active_bets[bet_key] = {
                 "bet_id": bet.id,
@@ -158,7 +157,7 @@ class Bet(commands.GroupCog):
             stake = await BetStake.create(
                 bet_id=active_bet["bet_id"],
                 player=active_bet["player1"] if interaction.user.id == active_bet["player1"].discord_id else active_bet["player2"],
-                ball_instance=nba,
+                ballinstance=nba,
             )
             if interaction.user.id == active_bet["player1"].discord_id:
                 active_bet["player1_stakes"].append(stake)
@@ -209,7 +208,7 @@ class Bet(commands.GroupCog):
                 else active_bet["player2_stakes"]
             )
             for stake in stakes:
-                if stake.ball_instance.id == nba.id:
+                if stake.ballinstance.id == nba.id:
                     stakes.remove(stake)
                     await stake.delete()
                     await interaction.followup.send("NBA removed from bet.", ephemeral=True)
@@ -255,7 +254,7 @@ class Bet(commands.GroupCog):
 
             nba_list = []
             for stake in stakes:
-                nba_list.append(f"• {stake.ball_instance.ball.country}")
+                nba_list.append(f"• {stake.ballinstance.ball.country}")
 
             embed.description = "\n".join(nba_list)
             embed.set_footer(text=f"Total: {len(stakes)} NBAs")
