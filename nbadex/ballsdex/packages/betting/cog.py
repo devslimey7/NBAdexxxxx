@@ -4,7 +4,8 @@ from discord.ext import commands
 from typing import TYPE_CHECKING
 from datetime import datetime, timedelta
 
-from ballsdex.core.models import Player, BallInstance, Bet, BetStake, BetHistory, Ball
+from ballsdex.core.models import Player, BallInstance, Bet, BetStake, BetHistory
+from ballsdex.core.utils.transformers import BallInstanceTransform
 from ballsdex.settings import settings
 
 if TYPE_CHECKING:
@@ -21,33 +22,7 @@ def betting_channel_check(interaction: discord.Interaction) -> bool:
     return True
 
 
-async def nba_autocomplete(
-    interaction: discord.Interaction,
-    current: str,
-) -> list[app_commands.Choice[int]]:
-    """Autocomplete for selecting NBAs from user's inventory"""
-    try:
-        player = await Player.get_or_none(discord_id=interaction.user.id)
-        if not player:
-            return []
-        
-        # Get user's NBAs
-        nbas = await BallInstance.filter(player=player).prefetch_related("ball")
-        
-        # Filter by current input (search by ball name or instance ID)
-        choices = []
-        for nba in nbas:
-            ball_name = nba.ball.name if nba.ball else "Unknown"
-            label = f"{ball_name} (#{nba.id})"
-            
-            if current.lower() in label.lower():
-                choices.append(app_commands.Choice(name=label[:100], value=nba.id))
-        
-        return choices[:25]  # Discord limit
-    except Exception:
-        return []
-
-
+@app_commands.guild_only()
 class Betting(commands.GroupCog):
     """
     Bet NBAs with other players.
@@ -64,8 +39,12 @@ class Betting(commands.GroupCog):
         """Begin a bet with another user."""
         await interaction.response.defer(ephemeral=True)
 
+        if user.bot:
+            await interaction.followup.send("You cannot bet with bots.", ephemeral=True)
+            return
+
         if user.id == interaction.user.id:
-            await interaction.followup.send("You cannot bet with yourself!", ephemeral=True)
+            await interaction.followup.send("You cannot bet with yourself.", ephemeral=True)
             return
 
         bet_key = (interaction.user.id, user.id)
@@ -76,15 +55,19 @@ class Betting(commands.GroupCog):
             return
 
         try:
-            p1 = await Player.get_or_create(discord_id=interaction.user.id)
-            p2 = await Player.get_or_create(discord_id=user.id)
+            p1, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            p2, _ = await Player.get_or_create(discord_id=user.id)
         except Exception as e:
             await interaction.followup.send(f"Error creating players: {str(e)}", ephemeral=True)
             return
 
         try:
-            bet = await Bet.create(player1=p1[0], player2=p2[0])
-            self.active_bets[bet_key] = {"bet_id": bet.id, "player1_nba_ids": set(), "player2_nba_ids": set()}
+            bet = await Bet.create(player1=p1, player2=p2)
+            self.active_bets[bet_key] = {
+                "bet_id": bet.id,
+                "player1_nba_ids": set(),
+                "player2_nba_ids": set(),
+            }
 
             embed = discord.Embed(
                 title="Bet Started",
@@ -106,10 +89,14 @@ class Betting(commands.GroupCog):
     async def add(
         self,
         interaction: discord.Interaction,
-        nba: int,
+        nba: BallInstanceTransform,
     ):
         """Add an NBA to your ongoing bet."""
         await interaction.response.defer(ephemeral=True)
+
+        if not nba:
+            await interaction.followup.send("Invalid NBA.", ephemeral=True)
+            return
 
         active_bet = None
         for key, val in self.active_bets.items():
@@ -129,24 +116,23 @@ class Betting(commands.GroupCog):
             return
 
         try:
-            ball_instance = await BallInstance.get(id=nba, player=player)
-            await BetStake.create(bet=bet, player=player, ballinstance=ball_instance)
-            
+            await BetStake.create(bet=bet, player=player, ballinstance=nba)
+
             if bet.player1_id == player.id:
-                active_bet["player1_nba_ids"].add(nba)
+                active_bet["player1_nba_ids"].add(nba.id)
             else:
-                active_bet["player2_nba_ids"].add(nba)
-            
+                active_bet["player2_nba_ids"].add(nba.id)
+
             embed = discord.Embed(
                 title="NBA Added to Bet",
-                description=f"Added NBA #{nba}",
+                description=f"Added {nba.ball.name} (#{nba.id})",
                 color=discord.Color.green(),
             )
             embed.set_footer(text=f"Bet ID: {bet.id}")
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             await interaction.followup.send(
-                f"Error adding NBA: {str(e)} - Make sure you own this NBA.", ephemeral=True
+                f"Error adding NBA: {str(e)}", ephemeral=True
             )
 
     @app_commands.command()
@@ -155,10 +141,14 @@ class Betting(commands.GroupCog):
     async def remove(
         self,
         interaction: discord.Interaction,
-        nba: int,
+        nba: BallInstanceTransform,
     ):
         """Remove an NBA from your stakes in the ongoing bet."""
         await interaction.response.defer(ephemeral=True)
+
+        if not nba:
+            await interaction.followup.send("Invalid NBA.", ephemeral=True)
+            return
 
         active_bet = None
         for key, val in self.active_bets.items():
@@ -178,17 +168,17 @@ class Betting(commands.GroupCog):
             return
 
         try:
-            stake = await BetStake.get(bet=bet, ballinstance_id=nba, player=player)
+            stake = await BetStake.get(bet=bet, ballinstance=nba, player=player)
             await stake.delete()
 
             if bet.player1_id == player.id:
-                active_bet["player1_nba_ids"].discard(nba)
+                active_bet["player1_nba_ids"].discard(nba.id)
             else:
-                active_bet["player2_nba_ids"].discard(nba)
+                active_bet["player2_nba_ids"].discard(nba.id)
 
             embed = discord.Embed(
                 title="NBA Removed from Bet",
-                description=f"Removed NBA #{nba}",
+                description=f"Removed {nba.ball.name} (#{nba.id})",
                 color=discord.Color.orange(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -205,11 +195,9 @@ class Betting(commands.GroupCog):
         await interaction.response.defer(ephemeral=True)
 
         active_bet = None
-        bet_key = None
         for key, val in self.active_bets.items():
             if interaction.user.id in key:
                 active_bet = val
-                bet_key = key
                 break
 
         if not active_bet:
@@ -286,10 +274,7 @@ class Betting(commands.GroupCog):
     @app_commands.command()
     @app_commands.guilds(discord.Object(id=BETTING_GUILD_ID))
     @app_commands.check(betting_channel_check)
-    async def bulk_add(
-        self,
-        interaction: discord.Interaction,
-    ):
+    async def bulk_add(self, interaction: discord.Interaction):
         """Bulk add NBAs to the ongoing bet from your inventory."""
         await interaction.response.defer(ephemeral=True)
 
@@ -310,16 +295,16 @@ class Betting(commands.GroupCog):
             await interaction.followup.send(f"Error retrieving bet: {str(e)}", ephemeral=True)
             return
 
-        instances = await BallInstance.filter(player=player).limit(10)
-
-        if not instances:
-            await interaction.followup.send(
-                "You have no NBAs to add.", ephemeral=True
-            )
-            return
-
-        added_count = 0
         try:
+            instances = await BallInstance.filter(player=player).limit(10)
+
+            if not instances:
+                await interaction.followup.send(
+                    "You have no NBAs to add.", ephemeral=True
+                )
+                return
+
+            added_count = 0
             for instance in instances:
                 existing = await BetStake.filter(
                     bet=bet, ballinstance=instance, player=player
@@ -382,8 +367,9 @@ class Betting(commands.GroupCog):
                     if item.winner_id
                     else "Draw"
                 )
+                opponent_id = item.player2_id if item.player1_id == interaction.user.id else item.player1_id
                 embed.add_field(
-                    name=f"Bet vs <@{item.player2_id if item.player1_id == interaction.user.id else item.player1_id}>",
+                    name=f"Bet vs <@{opponent_id}>",
                     value=f"**Status:** {status}\n**Winner:** {winner}\n**Date:** <t:{int(item.bet_date.timestamp())}>",
                     inline=False,
                 )
