@@ -346,11 +346,9 @@ class Bet(commands.GroupCog):
         sorting: app_commands.Choice[str] | None = None,
         trade_user: discord.User | None = None,
         days: Optional[int] = None,
-        nba: BallEnabledTransform | None = None,
-        special: SpecialEnabledTransform | None = None,
     ):
         """
-        View your betting history with pagination and filtering.
+        View your betting history with pagination.
 
         Parameters
         ----------
@@ -360,10 +358,6 @@ class Bet(commands.GroupCog):
             The user you want to see your bet history with.
         days: Optional[int]
             Retrieve bet history from last x days.
-        nba: BallEnabledTransform | None
-            The NBA to filter the bet history by.
-        special: SpecialEnabledTransform | None
-            The special to filter the bet history by.
         """
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
@@ -376,14 +370,14 @@ class Bet(commands.GroupCog):
                 )
                 return
 
-            queryset = BetHistory.filter(
-                Q(player1_id=user.id) | Q(player2_id=user.id)
-            )
-
             if trade_user:
                 queryset = BetHistory.filter(
                     (Q(player1_id=user.id, player2_id=trade_user.id))
                     | (Q(player1_id=trade_user.id, player2_id=user.id))
+                )
+            else:
+                queryset = BetHistory.filter(
+                    Q(player1_id=user.id) | Q(player2_id=user.id)
                 )
 
             if days is not None and days > 0:
