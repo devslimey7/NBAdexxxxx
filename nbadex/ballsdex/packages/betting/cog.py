@@ -339,12 +339,10 @@ class Bet(commands.GroupCog):
         interaction: discord.Interaction["BallsDexBot"],
     ):
         """
-        View your betting history.
-        
-        Coming soon - feature in development.
+        View your betting history (coming soon).
         """
         await interaction.response.send_message(
-            "Betting history feature is coming soon! For now, your bets are tracked in the background.",
+            "Betting history is coming soon! Your bets are being tracked in the background.",
             ephemeral=True
         )
 
