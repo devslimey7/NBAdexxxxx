@@ -4,7 +4,7 @@ from discord.ext import commands
 from typing import TYPE_CHECKING
 from datetime import datetime, timedelta
 
-from ballsdex.core.models import Player, BallInstance, Bet, BetStake, BetHistory
+from ballsdex.core.models import Player, BallInstance, Bet, BetStake, BetHistory, Ball
 from ballsdex.settings import settings
 
 if TYPE_CHECKING:
@@ -14,27 +14,38 @@ BETTING_GUILD_ID = 1440962506796433519
 BETTING_CHANNEL_ID = 1443544409684836382
 
 
-class BettingView(discord.ui.View):
-    """Base view for betting interactions"""
-
-    def __init__(self, user_id: int, timeout: float = 180):
-        super().__init__(timeout=timeout)
-        self.user_id = user_id
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "You are not allowed to interact with this.", ephemeral=True
-            )
-            return False
-        return True
-
-
 def betting_channel_check(interaction: discord.Interaction) -> bool:
     """Check if user is in betting channel"""
     if interaction.guild_id != BETTING_GUILD_ID or interaction.channel_id != BETTING_CHANNEL_ID:
         return False
     return True
+
+
+async def nba_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[int]]:
+    """Autocomplete for selecting NBAs from user's inventory"""
+    try:
+        player = await Player.get_or_none(discord_id=interaction.user.id)
+        if not player:
+            return []
+        
+        # Get user's NBAs
+        nbas = await BallInstance.filter(player=player).prefetch_related("ball")
+        
+        # Filter by current input (search by ball name or instance ID)
+        choices = []
+        for nba in nbas:
+            ball_name = nba.ball.name if nba.ball else "Unknown"
+            label = f"{ball_name} (#{nba.id})"
+            
+            if current.lower() in label.lower():
+                choices.append(app_commands.Choice(name=label[:100], value=nba.id))
+        
+        return choices[:25]  # Discord limit
+    except Exception:
+        return []
 
 
 class Betting(commands.GroupCog):
@@ -95,19 +106,15 @@ class Betting(commands.GroupCog):
     async def add(
         self,
         interaction: discord.Interaction,
-        footdex: int | None = None,
-        economy: str | None = None,
-        pack: str | None = None,
+        nba: int,
     ):
-        """Add an NBA, coins or packs to your ongoing bet."""
+        """Add an NBA to your ongoing bet."""
         await interaction.response.defer(ephemeral=True)
 
-        bet_key_self = (interaction.user.id,)
         active_bet = None
         for key, val in self.active_bets.items():
             if interaction.user.id in key:
                 active_bet = val
-                bet_key_self = key
                 break
 
         if not active_bet:
@@ -121,30 +128,26 @@ class Betting(commands.GroupCog):
             await interaction.followup.send(f"Error retrieving bet: {str(e)}", ephemeral=True)
             return
 
-        added_items = []
-
-        if footdex:
-            try:
-                ball_instance = await BallInstance.get(id=footdex, player=player)
-                await BetStake.create(bet=bet, player=player, ballinstance=ball_instance)
-                if bet.player1_id == player.id:
-                    active_bet["player1_nba_ids"].add(footdex)
-                else:
-                    active_bet["player2_nba_ids"].add(footdex)
-                added_items.append(f"NBA #{footdex}")
-            except Exception as e:
-                await interaction.followup.send(
-                    f"Error adding NBA: {str(e)} - Make sure you own this NBA.", ephemeral=True
-                )
-                return
-
-        embed = discord.Embed(
-            title="Added to Bet",
-            description=f"Added {', '.join(added_items) if added_items else 'item(s)'}",
-            color=discord.Color.green(),
-        )
-        embed.set_footer(text=f"Bet ID: {bet.id}")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        try:
+            ball_instance = await BallInstance.get(id=nba, player=player)
+            await BetStake.create(bet=bet, player=player, ballinstance=ball_instance)
+            
+            if bet.player1_id == player.id:
+                active_bet["player1_nba_ids"].add(nba)
+            else:
+                active_bet["player2_nba_ids"].add(nba)
+            
+            embed = discord.Embed(
+                title="NBA Added to Bet",
+                description=f"Added NBA #{nba}",
+                color=discord.Color.green(),
+            )
+            embed.set_footer(text=f"Bet ID: {bet.id}")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(
+                f"Error adding NBA: {str(e)} - Make sure you own this NBA.", ephemeral=True
+            )
 
     @app_commands.command()
     @app_commands.guilds(discord.Object(id=BETTING_GUILD_ID))
@@ -152,9 +155,7 @@ class Betting(commands.GroupCog):
     async def remove(
         self,
         interaction: discord.Interaction,
-        footdex: int | None = None,
-        economy: str | None = None,
-        pack: str | None = None,
+        nba: int,
     ):
         """Remove an NBA from your stakes in the ongoing bet."""
         await interaction.response.defer(ephemeral=True)
@@ -176,26 +177,25 @@ class Betting(commands.GroupCog):
             await interaction.followup.send(f"Error retrieving bet: {str(e)}", ephemeral=True)
             return
 
-        if footdex:
-            try:
-                stake = await BetStake.get(bet=bet, ballinstance_id=footdex, player=player)
-                await stake.delete()
+        try:
+            stake = await BetStake.get(bet=bet, ballinstance_id=nba, player=player)
+            await stake.delete()
 
-                if bet.player1_id == player.id:
-                    active_bet["player1_nba_ids"].discard(footdex)
-                else:
-                    active_bet["player2_nba_ids"].discard(footdex)
+            if bet.player1_id == player.id:
+                active_bet["player1_nba_ids"].discard(nba)
+            else:
+                active_bet["player2_nba_ids"].discard(nba)
 
-                embed = discord.Embed(
-                    title="Removed from Bet",
-                    description=f"Removed NBA #{footdex}",
-                    color=discord.Color.orange(),
-                )
-                await interaction.followup.send(embed=embed, ephemeral=True)
-            except Exception as e:
-                await interaction.followup.send(
-                    f"Error removing NBA: {str(e)}", ephemeral=True
-                )
+            embed = discord.Embed(
+                title="NBA Removed from Bet",
+                description=f"Removed NBA #{nba}",
+                color=discord.Color.orange(),
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(
+                f"Error removing NBA: {str(e)}", ephemeral=True
+            )
 
     @app_commands.command()
     @app_commands.guilds(discord.Object(id=BETTING_GUILD_ID))
@@ -289,11 +289,8 @@ class Betting(commands.GroupCog):
     async def bulk_add(
         self,
         interaction: discord.Interaction,
-        footdex: str | None = None,
-        sort: str | None = None,
-        special: str | None = None,
     ):
-        """Bulk add FootDexes to the ongoing bet, with parameters like sort and special."""
+        """Bulk add NBAs to the ongoing bet from your inventory."""
         await interaction.response.defer(ephemeral=True)
 
         active_bet = None
@@ -313,26 +310,11 @@ class Betting(commands.GroupCog):
             await interaction.followup.send(f"Error retrieving bet: {str(e)}", ephemeral=True)
             return
 
-        query = BallInstance.filter(player=player)
-
-        if footdex and footdex.isdigit():
-            ball_id = int(footdex)
-            query = query.filter(ballinstance__ball_id=ball_id)
-
-        if sort:
-            if sort.lower() == "rarity":
-                query = query.order_by("ballinstance__ball__rarity")
-            elif sort.lower() == "id":
-                query = query.order_by("id")
-
-        if special and special.lower() != "none":
-            query = query.filter(special__name__icontains=special)
-
-        instances = await query.limit(10)
+        instances = await BallInstance.filter(player=player).limit(10)
 
         if not instances:
             await interaction.followup.send(
-                "No NBAs found matching your criteria.", ephemeral=True
+                "You have no NBAs to add.", ephemeral=True
             )
             return
 
@@ -367,41 +349,19 @@ class Betting(commands.GroupCog):
         self,
         interaction: discord.Interaction,
         days: int | None = None,
-        sorting: str = "most_recent",
-        trade_user: discord.User | None = None,
-        footdex: int | None = None,
-        special: str | None = None,
     ):
-        """Retrieve bet history from last x days with various filters."""
+        """Retrieve bet history from last x days."""
         await interaction.response.defer(ephemeral=True)
 
         days = days or 7
         cutoff_date = datetime.now() - timedelta(days=days)
 
-        query = BetHistory.filter(
-            bet_date__gte=cutoff_date,
-        ).filter(
-            (
-                player1_id == interaction.user.id | player2_id == interaction.user.id
-            )
-        )
-
-        if trade_user:
-            query = query.filter(
-                (
-                    player1_id == trade_user.id | player2_id == trade_user.id
-                )
-            )
-
-        if sorting == "most_recent":
-            query = query.order_by("-bet_date")
-        elif sorting == "oldest":
-            query = query.order_by("bet_date")
-        elif sorting == "wins":
-            query = query.order_by("-winner_id")
-
         try:
-            history_items = await query.limit(10)
+            history_items = await BetHistory.filter(
+                bet_date__gte=cutoff_date,
+            ).filter(
+                player1_id == interaction.user.id | player2_id == interaction.user.id
+            ).order_by("-bet_date").limit(10)
 
             if not history_items:
                 await interaction.followup.send(
