@@ -622,6 +622,7 @@ class Bet(models.Model):
         return str(self.pk)
 
     class Meta:
+        table = "bet"
         indexes = [
             PostgreSQLIndex(fields=("player1_id",)),
             PostgreSQLIndex(fields=("player2_id",)),
@@ -645,6 +646,7 @@ class BetStake(models.Model):
         return str(self.pk)
 
     class Meta:
+        table = "betstake"
         indexes = [
             PostgreSQLIndex(fields=("ballinstance_id",)),
             PostgreSQLIndex(fields=("player_id",)),
@@ -666,6 +668,7 @@ class BetHistory(models.Model):
         return str(self.pk)
 
     class Meta:
+        table = "bethistory"
         indexes = [
             PostgreSQLIndex(fields=("player1_id",)),
             PostgreSQLIndex(fields=("player2_id",)),
