@@ -275,8 +275,13 @@ class Betting(commands.GroupCog):
         except Exception as e:
             await interaction.followup.send(f"Error cancelling bet: {str(e)}", ephemeral=True)
 
-    @app_commands.command()
-    @app_commands.guilds(discord.Object(id=BETTING_GUILD_ID))
+    bulk = app_commands.Group(
+        name="bulk",
+        description="Bulk betting commands",
+        guild_ids=[BETTING_GUILD_ID],
+    )
+
+    @bulk.command(name="add")
     @app_commands.check(betting_channel_check)
     async def bulk_add(self, interaction: discord.Interaction):
         """Bulk add NBAs to the ongoing bet from your inventory."""
@@ -300,7 +305,7 @@ class Betting(commands.GroupCog):
             return
 
         try:
-            instances = await BallInstance.filter(player=player).limit(10)
+            instances = await BallInstance.filter(player=player).prefetch_related("ball")
 
             if not instances:
                 await interaction.followup.send(
