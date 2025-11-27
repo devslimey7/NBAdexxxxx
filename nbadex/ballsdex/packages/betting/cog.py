@@ -363,7 +363,7 @@ class Bet(commands.GroupCog):
                     stake = await BetStake.create(
                         bet_id=active_bet["bet_id"],
                         player=active_bet["player1"] if interaction.user.id == active_bet["player1"].discord_id else active_bet["player2"],
-                        ball_instance=nba_instance,
+                        ballinstance=nba_instance,
                     )
                     if interaction.user.id == active_bet["player1"].discord_id:
                         active_bet["player1_stakes"].append(stake)
@@ -403,14 +403,14 @@ class Bet(commands.GroupCog):
 
         try:
             query = BetHistory.filter(
-                Q(bet__player1__discord_id=interaction.user.id)
-                | Q(bet__player2__discord_id=interaction.user.id)
+                Q(player1_id=interaction.user.id)
+                | Q(player2_id=interaction.user.id)
             )
 
             if days > 0:
-                from datetime import datetime, timedelta
+                from datetime import timedelta
                 cutoff = discord.utils.utcnow() - timedelta(days=days)
-                query = query.filter(created_at__gte=cutoff)
+                query = query.filter(bet_date__gte=cutoff)
 
             history = await query.all()
 
@@ -425,7 +425,9 @@ class Bet(commands.GroupCog):
 
             history_list = []
             for bet_hist in history[:25]:  # Limit to 25 for embed
-                history_list.append(f"• {bet_hist.status.upper()} - {bet_hist.created_at}")
+                status = "CANCELLED" if bet_hist.cancelled else "COMPLETED"
+                winner_text = f" (You won {bet_hist.player1_count if bet_hist.player1_id == interaction.user.id else bet_hist.player2_count})" if not bet_hist.cancelled and bet_hist.winner_id == interaction.user.id else ""
+                history_list.append(f"• {status} - {bet_hist.bet_date.strftime('%Y-%m-%d %H:%M')}{winner_text}")
 
             embed.description = "\n".join(history_list)
             embed.set_footer(text=f"Total: {len(history)} bets")
