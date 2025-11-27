@@ -12,18 +12,19 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Nov 27, 2025)
 
-- **BETTING SYSTEM COMPLETE**: Fully working betting system with 7 commands matching Trade cog structure
+- **BETTING SYSTEM FULLY OPERATIONAL**: Complete betting system with 7 commands, all database issues resolved
   - Class named `Bet` for correct `/bet` command prefix (not `/betting`)
-  - New database models: `Bet`, `BetStake`, `BetHistory` (Tortoise ORM) with PostgreSQL tables
-  - 7 betting commands: `/bet begin`, `/bet add`, `/bet remove`, `/bet view`, `/bet cancel`, `/bet bulk add`, `/bet history`
+  - Database tables created: `bet`, `betstake`, `bethistory` (PostgreSQL with proper foreign keys)
+  - Tortoise ORM models: `Bet`, `BetStake`, `BetHistory` in `ballsdex.core.models`
+  - 7 betting commands working: `/bet begin`, `/bet add`, `/bet remove`, `/bet view`, `/bet cancel`, `/bet bulk add`, `/bet history`
   - Commands restricted to betting channel (1443544409684836382) in admin guild (1440962506796433519)
-  - Betting channel restriction enforced via `@app_commands.check(betting_channel_check)` on each command
+  - Channel check enforced via `@app_commands.check(betting_channel_check)` on each command
   - `/bet add` and `/bet remove` use `BallInstanceTransform` for autocomplete with NBA filtering
-  - `/bet bulk add` supports filtering by ball type, special event, sort order, and custom filters
-  - Betting system uses in-memory state management (TTLCache with 30-min timeout for active bets)
-  - Structure exactly mirrors Trade cog for consistency and maintainability
-  - Created new cog package: `ballsdex.packages.betting`
-  - Bot operational with all 7 betting commands loaded and synced
+  - `/bet bulk add` supports filtering by ball type, special event, sort order
+  - Betting uses in-memory TTLCache (30-min timeout for active bets)
+  - Structure mirrors Trade cog exactly for consistency
+  - Created new cog: `ballsdex.packages.betting`
+  - All commands synced and operational
 
 # Previous Session (Nov 25, 2025)
 - **COMPLETE REMOVAL OF COINS SYSTEM**: Dropped `coins` column from database and removed all economy-related code
