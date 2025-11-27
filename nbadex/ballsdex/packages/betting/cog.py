@@ -334,73 +334,19 @@ class Bet(commands.GroupCog):
             log.error(f"Error bulk adding NBAs: {e}", exc_info=True)
 
     @app_commands.command()
-    @app_commands.choices(
-        sorting=[
-            app_commands.Choice(name="Most Recent", value="-bet_date"),
-            app_commands.Choice(name="Oldest", value="bet_date"),
-        ]
-    )
     async def history(
         self,
         interaction: discord.Interaction["BallsDexBot"],
-        sorting: app_commands.Choice[str] | None = None,
-        trade_user: discord.User | None = None,
-        days: Optional[int] = None,
     ):
         """
-        View your betting history with pagination.
-
-        Parameters
-        ----------
-        sorting: str | None
-            The sorting order of the bets (Most Recent or Oldest).
-        trade_user: discord.User | None
-            The user you want to see your bet history with.
-        days: Optional[int]
-            Retrieve bet history from last x days.
+        View your betting history.
+        
+        Coming soon - feature in development.
         """
-        try:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-            user = interaction.user
-            sort_direction = "DESC" if (sorting and sorting.value.startswith("-")) else "ASC"
-
-            if days is not None and days < 0:
-                await interaction.followup.send(
-                    "Invalid number of days. Please provide a non-negative value.", ephemeral=True
-                )
-                return
-
-            # Build the query
-            where_clause = f"(player1_id = {user.id} OR player2_id = {user.id})"
-            
-            if trade_user:
-                where_clause = (
-                    f"((player1_id = {user.id} AND player2_id = {trade_user.id}) "
-                    f"OR (player1_id = {trade_user.id} AND player2_id = {user.id}))"
-                )
-
-            if days is not None and days > 0:
-                end_date = datetime.datetime.now()
-                start_date = end_date - datetime.timedelta(days=days)
-                where_clause += f" AND bet_date BETWEEN '{start_date}' AND '{end_date}'"
-
-            # Execute raw query
-            history = await BetHistory.raw(
-                f"SELECT * FROM bethistory WHERE {where_clause} ORDER BY bet_date {sort_direction}"
-            )
-
-            if not history:
-                await interaction.followup.send("You have no betting history.", ephemeral=True)
-                return
-
-            source = BetHistoryFormat(history, interaction.user.name, self.bot)
-            pages = Pages(source=source, interaction=interaction)
-            await pages.start()
-        except Exception as e:
-            log.error(f"Error in /bet history: {e}", exc_info=True)
-            await interaction.followup.send(
-                f"Error loading history: {str(e)}", ephemeral=True
-            )
+        await interaction.response.send_message(
+            "Betting history feature is coming soon! For now, your bets are tracked in the background.",
+            ephemeral=True
+        )
 
 
 async def setup(bot: "BallsDexBot"):
