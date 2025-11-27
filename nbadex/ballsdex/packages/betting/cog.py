@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -7,16 +6,18 @@ import discord
 from cachetools import TTLCache
 from discord import app_commands
 from discord.ext import commands
-from tortoise.expressions import Q
 
 from ballsdex.core.models import BallInstance, Player
 from ballsdex.core.utils.buttons import ConfirmChoiceView
+from ballsdex.core.utils.paginator import Pages
 from ballsdex.core.utils.sorting import FilteringChoices, SortingChoices, filter_balls, sort_balls
 from ballsdex.core.utils.transformers import (
     BallEnabledTransform,
     BallInstanceTransform,
     SpecialEnabledTransform,
 )
+from ballsdex.packages.betting.display import BetStakesSource
+from ballsdex.packages.betting.menu import BetView
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
@@ -41,10 +42,6 @@ class Bet(commands.GroupCog):
     def __init__(self, bot: "BallsDexBot"):
         self.bot = bot
         self.active_bets: TTLCache[tuple[int, int], dict] = TTLCache(maxsize=999999, ttl=1800)
-
-    async def get_db(self):
-        """Get database connection"""
-        return self.bot.db if hasattr(self.bot, 'db') else None
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -82,19 +79,26 @@ class Bet(commands.GroupCog):
             )
             return
 
-        # Create in-memory bet (no database needed for active bets)
-        self.active_bets[bet_key] = {
+        # Create in-memory bet
+        bet_data = {
             "player1": player1,
             "player2": player2,
             "player1_stakes": [],
             "player2_stakes": [],
-            "player1_locked": False,
-            "player2_locked": False,
             "started_at": discord.utils.utcnow(),
         }
-        await interaction.followup.send(
-            f"Bet started with {user.mention}! Use `/bet add` to add NBAs.", ephemeral=True
+        self.active_bets[bet_key] = bet_data
+
+        # Create interactive view
+        view = BetView(bet_data, self)
+        embed = discord.Embed(
+            title="Bet Started!",
+            description=f"Bet started between {interaction.user.mention} and {user.mention}",
+            color=discord.Color.green(),
         )
+        embed.add_field(name="Use Commands", value="`/bet add` - Add NBAs\n`/bet remove` - Remove NBAs\n`/bet view` - See stakes", inline=False)
+        
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -145,11 +149,18 @@ class Bet(commands.GroupCog):
                 return
 
         try:
-            if interaction.user.id == active_bet["player1"].discord_id:
-                active_bet["player1_stakes"].append(nba)
+            stakes = (
+                active_bet["player1_stakes"]
+                if interaction.user.id == active_bet["player1"].discord_id
+                else active_bet["player2_stakes"]
+            )
+            
+            # Check for duplicates
+            if nba not in stakes:
+                stakes.append(nba)
+                await interaction.followup.send(f"{nba.ball.country} added to bet.", ephemeral=True)
             else:
-                active_bet["player2_stakes"].append(nba)
-            await interaction.followup.send(f"{nba.ball.country} added to bet.", ephemeral=True)
+                await interaction.followup.send(f"{nba.ball.country} already in your bet.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error adding NBA to bet: {str(e)}", ephemeral=True)
             log.error(f"Error adding NBA to bet: {e}", exc_info=True)
@@ -193,12 +204,12 @@ class Bet(commands.GroupCog):
                 if interaction.user.id == active_bet["player1"].discord_id
                 else active_bet["player2_stakes"]
             )
-            for stake in stakes:
-                if stake.id == nba.id:
-                    stakes.remove(stake)
-                    await interaction.followup.send("NBA removed from bet.", ephemeral=True)
-                    return
-            await interaction.followup.send("NBA not found in your bet.", ephemeral=True)
+            
+            if nba in stakes:
+                stakes.remove(nba)
+                await interaction.followup.send("NBA removed from bet.", ephemeral=True)
+            else:
+                await interaction.followup.send("NBA not found in your bet.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error removing NBA from bet: {str(e)}", ephemeral=True)
             log.error(f"Error removing NBA from bet: {e}", exc_info=True)
@@ -207,7 +218,7 @@ class Bet(commands.GroupCog):
     @app_commands.check(betting_channel_check)
     async def view(self, interaction: discord.Interaction["BallsDexBot"]):
         """
-        View your current bet stakes.
+        View your current bet stakes with pagination.
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
 
@@ -232,18 +243,10 @@ class Bet(commands.GroupCog):
                 await interaction.followup.send("You have no NBAs in your bet.", ephemeral=True)
                 return
 
-            embed = discord.Embed(
-                title="Your Bet Stakes",
-                color=discord.Color.blue(),
-            )
-
-            nba_list = []
-            for stake in stakes:
-                nba_list.append(f"• {stake.ball.country}")
-
-            embed.description = "\n".join(nba_list)
-            embed.set_footer(text=f"Total: {len(stakes)} NBAs")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            # Create paginator
+            source = BetStakesSource(stakes, interaction.user.name, self.bot)
+            pages = Pages(source, ctx=interaction)
+            await pages.start()
         except Exception as e:
             await interaction.followup.send(f"Error viewing bet: {str(e)}", ephemeral=True)
             log.error(f"Error viewing bet: {e}", exc_info=True)
@@ -266,6 +269,18 @@ class Bet(commands.GroupCog):
 
         if not active_bet:
             await interaction.followup.send("You do not have an active bet.", ephemeral=True)
+            return
+
+        view = ConfirmChoiceView(
+            interaction,
+            accept_message="Cancelling bet...",
+            cancel_message="This request has been cancelled.",
+        )
+        await interaction.followup.send(
+            "Are you sure you want to cancel this bet?", view=view, ephemeral=True
+        )
+        await view.wait()
+        if not view.value:
             return
 
         try:
@@ -331,21 +346,18 @@ class Bet(commands.GroupCog):
                 )
                 return
 
-            # Add all matching NBAs
+            stakes = (
+                active_bet["player1_stakes"]
+                if interaction.user.id == active_bet["player1"].discord_id
+                else active_bet["player2_stakes"]
+            )
+            
+            # Add all matching NBAs (skip duplicates)
             created_count = 0
             for nba_instance in nbas:
-                try:
-                    stakes = (
-                        active_bet["player1_stakes"]
-                        if interaction.user.id == active_bet["player1"].discord_id
-                        else active_bet["player2_stakes"]
-                    )
-                    # Check for duplicates
-                    if nba_instance not in stakes:
-                        stakes.append(nba_instance)
-                        created_count += 1
-                except Exception:
-                    continue
+                if nba_instance not in stakes:
+                    stakes.append(nba_instance)
+                    created_count += 1
 
             await interaction.followup.send(
                 f"Added {created_count} NBAs to your bet.", ephemeral=True
@@ -362,7 +374,7 @@ class Bet(commands.GroupCog):
         days: int | None = None,
     ):
         """
-        View your betting history.
+        View your betting history (placeholder for future implementation).
 
         Parameters
         ----------
@@ -371,20 +383,13 @@ class Bet(commands.GroupCog):
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        if not days:
-            days = 7
-
-        try:
-            embed = discord.Embed(
-                title="Your Betting History",
-                color=discord.Color.blue(),
-            )
-            embed.description = "No betting history available yet."
-            embed.set_footer(text="Total: 0 bets")
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"Error retrieving history: {str(e)}", ephemeral=True)
-            log.error(f"Error retrieving history: {e}", exc_info=True)
+        embed = discord.Embed(
+            title="Your Betting History",
+            color=discord.Color.blue(),
+        )
+        embed.description = "No betting history available yet."
+        embed.set_footer(text="Total: 0 bets")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: "BallsDexBot"):
