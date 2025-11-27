@@ -299,6 +299,8 @@ class Bet(commands.GroupCog):
             )
             return
 
+        from ballsdex.packages.betting.menu import BallsSelector
+        
         try:
             query = BallInstance.filter(player__discord_id=interaction.user.id)
             if nba:
@@ -310,22 +312,21 @@ class Bet(commands.GroupCog):
             if filter:
                 query = filter_balls(filter, query, interaction.guild_id)
 
-            nbas = await query.all()
-            if not nbas:
+            ball_ids = await query.values_list("id", flat=True)
+            if not ball_ids:
                 await interaction.followup.send(
                     "No NBAs found matching your criteria.", ephemeral=True
                 )
                 return
 
-            added = 0
-            for nba_instance in nbas:
-                if nba_instance not in bettor.proposal:
-                    bettor.proposal.append(nba_instance)
-                    added += 1
-
-            await interaction.followup.send(f"Added {added} NBAs to your proposal.", ephemeral=True)
+            view = BallsSelector(interaction, ball_ids, self)
+            await view.start(
+                content="Select the NBAs you want to add to your proposal. "
+                "Note that the display will wipe on pagination however "
+                "the selected NBAs will remain."
+            )
         except Exception as e:
-            await interaction.followup.send(f"Error adding NBAs: {str(e)}", ephemeral=True)
+            await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
             log.error(f"Error bulk adding NBAs: {e}", exc_info=True)
 
     @app_commands.command()

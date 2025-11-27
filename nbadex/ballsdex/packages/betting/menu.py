@@ -1,15 +1,19 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, AsyncIterator, List, Set, cast
 
 import discord
 from discord.ui import Button, View, button
 from discord.utils import format_dt, utcnow
 
+from ballsdex.core.models import BallInstance
+from ballsdex.core.utils import menus
 from ballsdex.core.utils.buttons import ConfirmChoiceView
+from ballsdex.core.utils.paginator import Pages
 from ballsdex.packages.betting.betting_user import BettingUser
 from ballsdex.packages.betting.display import fill_bet_embed_fields
+from ballsdex.settings import settings
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
@@ -335,3 +339,165 @@ class BetMenu:
 
         await self.message.edit(content=None, embed=self.embed, view=self.current_view)
         return result
+
+
+class BallsSource(menus.ListPageSource):
+    """Pagination source for ball selection"""
+    
+    def __init__(self, entries: list[int]):
+        super().__init__(entries, per_page=25)
+        self.cache: dict[int, BallInstance] = {}
+
+    async def prepare(self):
+        first_entries = (
+            self.entries[: self.per_page * 5]
+            if len(self.entries) > self.per_page * 5
+            else self.entries
+        )
+        balls = await BallInstance.filter(id__in=first_entries)
+        for ball in balls:
+            self.cache[ball.pk] = ball
+
+    async def fetch_page(self, ball_ids: list[int]) -> AsyncIterator[BallInstance]:
+        if ball_ids[0] not in self.cache:
+            async for ball in BallInstance.filter(id__in=ball_ids):
+                self.cache[ball.pk] = ball
+        for id in ball_ids:
+            yield self.cache[id]
+
+    async def format_page(self, menu: "BallsSelector", ball_ids: list[int]):
+        await menu.set_options(self.fetch_page(ball_ids))
+        return True
+
+
+class BallsSelector(Pages):
+    """Selector for bulk adding NBAs to bet"""
+    
+    def __init__(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        balls: list[int],
+        cog: "BetCog",
+    ):
+        self.bot = interaction.client
+        self.interaction = interaction
+        source = BallsSource(balls)
+        super().__init__(source, interaction=interaction)
+        self.add_item(self.select_ball_menu)
+        self.add_item(self.confirm_button)
+        self.add_item(self.select_all_button)
+        self.add_item(self.clear_button)
+        self.balls_selected: Set[BallInstance] = set()
+        self.cog = cog
+
+    async def set_options(self, balls: AsyncIterator[BallInstance]):
+        options: List[discord.SelectOption] = []
+        async for ball in balls:
+            emoji = self.bot.get_emoji(int(ball.ball.emoji_id))
+            favorite = f"{settings.favorited_collectible_emoji} " if ball.favorite else ""
+            special = ball.special_emoji(self.bot, True)
+            options.append(
+                discord.SelectOption(
+                    label=f"{favorite}{special}#{ball.pk:0X} {ball.ball.country}",
+                    description=f"ATK: {ball.attack_bonus:+d}% • HP: {ball.health_bonus:+d}% • "
+                    f"Caught on {ball.catch_date.strftime('%d/%m/%y %H:%M')}",
+                    emoji=emoji,
+                    value=f"{ball.pk}",
+                    default=ball in self.balls_selected,
+                )
+            )
+        self.select_ball_menu.options = options
+        self.select_ball_menu.max_values = len(options)
+
+    @discord.ui.select(min_values=1, max_values=25)
+    async def select_ball_menu(
+        self, interaction: discord.Interaction["BallsDexBot"], item: discord.ui.Select
+    ):
+        for value in item.values:
+            ball_instance = await BallInstance.get(id=int(value)).prefetch_related(
+                "ball", "player"
+            )
+            self.balls_selected.add(ball_instance)
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Select Page", style=discord.ButtonStyle.secondary)
+    async def select_all_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        for ball in self.select_ball_menu.options:
+            ball_instance = await BallInstance.get(id=int(ball.value)).prefetch_related(
+                "ball", "player"
+            )
+            if ball_instance not in self.balls_selected:
+                self.balls_selected.add(ball_instance)
+        await interaction.followup.send(
+            "All NBAs on this page have been selected.\n"
+            "Note that the menu may not reflect this change until you change page.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary)
+    async def confirm_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        bet, bettor = self.cog.get_bet(self.interaction)
+        if bet is None or bettor is None:
+            return await interaction.followup.send(
+                "The bet has been cancelled or the user is not part of the bet.",
+                ephemeral=True,
+            )
+        if bettor.locked:
+            return await interaction.followup.send(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the bet instead.",
+                ephemeral=True,
+            )
+        if any(ball in bettor.proposal for ball in self.balls_selected):
+            return await interaction.followup.send(
+                "You have already added some of the NBAs you selected.",
+                ephemeral=True,
+            )
+
+        if len(self.balls_selected) == 0:
+            return await interaction.followup.send(
+                "You have not selected any NBAs to add to your proposal.",
+                ephemeral=True,
+            )
+        
+        for ball in self.balls_selected:
+            if ball.favorite:
+                view = ConfirmChoiceView(interaction)
+                await interaction.followup.send(
+                    "One or more of the NBAs is favorited, "
+                    "are you sure you want to add it to the bet?",
+                    view=view,
+                    ephemeral=True,
+                )
+                await view.wait()
+                if not view.value:
+                    return
+                break
+        
+        for ball in self.balls_selected:
+            bettor.proposal.append(ball)
+        
+        grammar = "NBA" if len(self.balls_selected) == 1 else "NBAs"
+        await interaction.followup.send(
+            f"{len(self.balls_selected)} {grammar} added to your proposal.", ephemeral=True
+        )
+        self.balls_selected.clear()
+
+    @discord.ui.button(label="Clear", style=discord.ButtonStyle.danger)
+    async def clear_button(self, interaction: discord.Interaction["BallsDexBot"], button: Button):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        self.balls_selected.clear()
+        await interaction.followup.send(
+            "You have cleared all currently selected NBAs.\n"
+            "This does not affect NBAs within your bet proposal.\n"
+            "There may be an instance where it shows NBAs on the"
+            " current page as selected, this is not the case - "
+            "changing page will show the correct state.",
+            ephemeral=True,
+        )
