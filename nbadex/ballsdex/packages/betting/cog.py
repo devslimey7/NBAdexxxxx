@@ -346,7 +346,7 @@ class Bet(commands.GroupCog):
         sorting: app_commands.Choice[str] | None = None,
         trade_user: discord.User | None = None,
         days: Optional[int] = None,
-        ball: BallEnabledTransform | None = None,
+        nba: BallEnabledTransform | None = None,
         special: SpecialEnabledTransform | None = None,
     ):
         """
@@ -360,7 +360,7 @@ class Bet(commands.GroupCog):
             The user you want to see your bet history with.
         days: Optional[int]
             Retrieve bet history from last x days.
-        ball: BallEnabledTransform | None
+        nba: BallEnabledTransform | None
             The NBA to filter the bet history by.
         special: SpecialEnabledTransform | None
             The special to filter the bet history by.
@@ -390,17 +390,12 @@ class Bet(commands.GroupCog):
             start_date = end_date - datetime.timedelta(days=days)
             queryset = queryset.filter(bet_date__range=(start_date, end_date))
 
-        if ball:
-            queryset = queryset.filter(Q(betstakes__ballinstance__ball=ball)).distinct()
+        if nba:
+            queryset = queryset.filter(Q(betstakes__ballinstance__ball=nba)).distinct()
         if special:
             queryset = queryset.filter(Q(betstakes__ballinstance__special=special)).distinct()
 
-        history = await queryset.order_by(sort_value).prefetch_related(
-            "player1",
-            "player2",
-            "betstakes__ballinstance__ball",
-            "betstakes__ballinstance__special",
-        )
+        history = await queryset.order_by(sort_value)
 
         if not history:
             await interaction.followup.send("No history found.", ephemeral=True)
