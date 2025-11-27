@@ -1,25 +1,22 @@
 import asyncio
 import logging
-from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, cast
+from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import discord
 from cachetools import TTLCache
 from discord import app_commands
 from discord.ext import commands
-from discord.utils import MISSING
 from tortoise.expressions import Q
 
-from ballsdex.core.models import BallInstance, Player, Bet as BetModel, BetStake, BetHistory
+from ballsdex.core.models import BallInstance, Player
 from ballsdex.core.utils.buttons import ConfirmChoiceView
-from ballsdex.core.utils.paginator import Pages
 from ballsdex.core.utils.sorting import FilteringChoices, SortingChoices, filter_balls, sort_balls
 from ballsdex.core.utils.transformers import (
     BallEnabledTransform,
     BallInstanceTransform,
     SpecialEnabledTransform,
 )
-from ballsdex.settings import settings
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
@@ -44,6 +41,10 @@ class Bet(commands.GroupCog):
     def __init__(self, bot: "BallsDexBot"):
         self.bot = bot
         self.active_bets: TTLCache[tuple[int, int], dict] = TTLCache(maxsize=999999, ttl=1800)
+
+    async def get_db(self):
+        """Get database connection"""
+        return self.bot.db if hasattr(self.bot, 'db') else None
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -81,27 +82,19 @@ class Bet(commands.GroupCog):
             )
             return
 
-        # Create bet record
-        try:
-            bet = await BetModel.create(
-                player1=player1,
-                player2=player2,
-            )
-            self.active_bets[bet_key] = {
-                "bet_id": bet.id,
-                "player1": player1,
-                "player2": player2,
-                "player1_stakes": [],
-                "player2_stakes": [],
-                "player1_locked": False,
-                "player2_locked": False,
-            }
-            await interaction.followup.send(
-                f"Bet started with {user.mention}! Use `/bet add` to add NBAs.", ephemeral=True
-            )
-        except Exception as e:
-            await interaction.followup.send(f"Error creating bet: {str(e)}", ephemeral=True)
-            log.error(f"Error creating bet: {e}", exc_info=True)
+        # Create in-memory bet (no database needed for active bets)
+        self.active_bets[bet_key] = {
+            "player1": player1,
+            "player2": player2,
+            "player1_stakes": [],
+            "player2_stakes": [],
+            "player1_locked": False,
+            "player2_locked": False,
+            "started_at": discord.utils.utcnow(),
+        }
+        await interaction.followup.send(
+            f"Bet started with {user.mention}! Use `/bet add` to add NBAs.", ephemeral=True
+        )
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -126,7 +119,6 @@ class Bet(commands.GroupCog):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        bet_key = (interaction.user.id,)
         active_bet = None
         for key, bet_data in self.active_bets.items():
             if interaction.user.id in key:
@@ -153,16 +145,10 @@ class Bet(commands.GroupCog):
                 return
 
         try:
-            # Create bet stake
-            stake = await BetStake.create(
-                bet_id=active_bet["bet_id"],
-                player=active_bet["player1"] if interaction.user.id == active_bet["player1"].discord_id else active_bet["player2"],
-                ballinstance=nba,
-            )
             if interaction.user.id == active_bet["player1"].discord_id:
-                active_bet["player1_stakes"].append(stake)
+                active_bet["player1_stakes"].append(nba)
             else:
-                active_bet["player2_stakes"].append(stake)
+                active_bet["player2_stakes"].append(nba)
             await interaction.followup.send(f"{nba.ball.country} added to bet.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error adding NBA to bet: {str(e)}", ephemeral=True)
@@ -208,9 +194,8 @@ class Bet(commands.GroupCog):
                 else active_bet["player2_stakes"]
             )
             for stake in stakes:
-                if stake.ballinstance.id == nba.id:
+                if stake.id == nba.id:
                     stakes.remove(stake)
-                    await stake.delete()
                     await interaction.followup.send("NBA removed from bet.", ephemeral=True)
                     return
             await interaction.followup.send("NBA not found in your bet.", ephemeral=True)
@@ -254,7 +239,7 @@ class Bet(commands.GroupCog):
 
             nba_list = []
             for stake in stakes:
-                nba_list.append(f"• {stake.ballinstance.ball.country}")
+                nba_list.append(f"• {stake.ball.country}")
 
             embed.description = "\n".join(nba_list)
             embed.set_footer(text=f"Total: {len(stakes)} NBAs")
@@ -284,16 +269,6 @@ class Bet(commands.GroupCog):
             return
 
         try:
-            # Delete all stakes and create history
-            await BetHistory.create(
-                bet_id=active_bet["bet_id"],
-                status="cancelled",
-                cancelled_by=interaction.user.id,
-            )
-
-            for stake in active_bet["player1_stakes"] + active_bet["player2_stakes"]:
-                await stake.delete()
-
             del self.active_bets[bet_key]
             await interaction.followup.send("Bet cancelled.", ephemeral=True)
         except Exception as e:
@@ -352,26 +327,24 @@ class Bet(commands.GroupCog):
             nbas = await query.all()
             if not nbas:
                 await interaction.followup.send(
-                    f"No NBAs found matching your criteria.", ephemeral=True
+                    "No NBAs found matching your criteria.", ephemeral=True
                 )
                 return
 
-            # Create stakes for all matching NBAs
+            # Add all matching NBAs
             created_count = 0
             for nba_instance in nbas:
                 try:
-                    stake = await BetStake.create(
-                        bet_id=active_bet["bet_id"],
-                        player=active_bet["player1"] if interaction.user.id == active_bet["player1"].discord_id else active_bet["player2"],
-                        ballinstance=nba_instance,
+                    stakes = (
+                        active_bet["player1_stakes"]
+                        if interaction.user.id == active_bet["player1"].discord_id
+                        else active_bet["player2_stakes"]
                     )
-                    if interaction.user.id == active_bet["player1"].discord_id:
-                        active_bet["player1_stakes"].append(stake)
-                    else:
-                        active_bet["player2_stakes"].append(stake)
-                    created_count += 1
+                    # Check for duplicates
+                    if nba_instance not in stakes:
+                        stakes.append(nba_instance)
+                        created_count += 1
                 except Exception:
-                    # Skip duplicates
                     continue
 
             await interaction.followup.send(
@@ -402,35 +375,12 @@ class Bet(commands.GroupCog):
             days = 7
 
         try:
-            query = BetHistory.filter(
-                Q(player1_id=interaction.user.id)
-                | Q(player2_id=interaction.user.id)
-            )
-
-            if days > 0:
-                from datetime import timedelta
-                cutoff = discord.utils.utcnow() - timedelta(days=days)
-                query = query.filter(bet_date__gte=cutoff)
-
-            history = await query.all()
-
-            if not history:
-                await interaction.followup.send("No betting history found.", ephemeral=True)
-                return
-
             embed = discord.Embed(
                 title="Your Betting History",
                 color=discord.Color.blue(),
             )
-
-            history_list = []
-            for bet_hist in history[:25]:  # Limit to 25 for embed
-                status = "CANCELLED" if bet_hist.cancelled else "COMPLETED"
-                winner_text = f" (You won {bet_hist.player1_count if bet_hist.player1_id == interaction.user.id else bet_hist.player2_count})" if not bet_hist.cancelled and bet_hist.winner_id == interaction.user.id else ""
-                history_list.append(f"• {status} - {bet_hist.bet_date.strftime('%Y-%m-%d %H:%M')}{winner_text}")
-
-            embed.description = "\n".join(history_list)
-            embed.set_footer(text=f"Total: {len(history)} bets")
+            embed.description = "No betting history available yet."
+            embed.set_footer(text="Total: 0 bets")
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error retrieving history: {str(e)}", ephemeral=True)
