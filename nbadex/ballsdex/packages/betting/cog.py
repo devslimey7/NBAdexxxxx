@@ -365,45 +365,49 @@ class Bet(commands.GroupCog):
         special: SpecialEnabledTransform | None
             The special to filter the bet history by.
         """
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        user = interaction.user
-        sort_value = sorting.value if sorting else "-bet_date"
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            user = interaction.user
+            sort_value = sorting.value if sorting else "-bet_date"
 
-        if days is not None and days < 0:
-            await interaction.followup.send(
-                "Invalid number of days. Please provide a non-negative value.", ephemeral=True
-            )
-            return
+            if days is not None and days < 0:
+                await interaction.followup.send(
+                    "Invalid number of days. Please provide a non-negative value.", ephemeral=True
+                )
+                return
 
-        if trade_user:
-            queryset = BetHistory.filter(
-                (Q(player1_id=user.id, player2_id=trade_user.id))
-                | (Q(player1_id=trade_user.id, player2_id=user.id))
-            )
-        else:
             queryset = BetHistory.filter(
                 Q(player1_id=user.id) | Q(player2_id=user.id)
             )
 
-        if days is not None and days > 0:
-            end_date = datetime.datetime.now()
-            start_date = end_date - datetime.timedelta(days=days)
-            queryset = queryset.filter(bet_date__range=(start_date, end_date))
+            if trade_user:
+                queryset = BetHistory.filter(
+                    (Q(player1_id=user.id, player2_id=trade_user.id))
+                    | (Q(player1_id=trade_user.id, player2_id=user.id))
+                )
 
-        if nba:
-            queryset = queryset.filter(Q(betstakes__ballinstance__ball=nba)).distinct()
-        if special:
-            queryset = queryset.filter(Q(betstakes__ballinstance__special=special)).distinct()
+            if days is not None and days > 0:
+                end_date = datetime.datetime.now()
+                start_date = end_date - datetime.timedelta(days=days)
+                queryset = queryset.filter(bet_date__range=(start_date, end_date))
 
-        history = await queryset.order_by(sort_value)
+            history = await queryset.order_by(sort_value)
 
-        if not history:
-            await interaction.followup.send("No history found.", ephemeral=True)
-            return
+            if not history:
+                await interaction.followup.send("You have no betting history.", ephemeral=True)
+                return
 
-        source = BetHistoryFormat(history, interaction.user.name, self.bot)
-        pages = Pages(source=source, interaction=interaction)
-        await pages.start()
+            source = BetHistoryFormat(history, interaction.user.name, self.bot)
+            pages = Pages(source=source, interaction=interaction)
+            await pages.start()
+        except Exception as e:
+            log.error(f"Error in /bet history: {e}", exc_info=True)
+            try:
+                await interaction.followup.send(
+                    f"Error loading history: {str(e)}", ephemeral=True
+                )
+            except:
+                pass
 
 
 async def setup(bot: "BallsDexBot"):
