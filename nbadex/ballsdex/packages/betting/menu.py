@@ -415,7 +415,7 @@ class BallsSelector(Pages):
     ):
         for value in item.values:
             ball_instance = await BallInstance.get(id=int(value)).prefetch_related(
-                "countryball", "player"
+                "ball", "player"
             )
             self.balls_selected.add(ball_instance)
         await interaction.response.defer()
@@ -427,7 +427,7 @@ class BallsSelector(Pages):
         await interaction.response.defer(thinking=True, ephemeral=True)
         for ball in self.select_ball_menu.options:
             ball_instance = await BallInstance.get(id=int(ball.value)).prefetch_related(
-                "countryball", "player"
+                "ball", "player"
             )
             if ball_instance not in self.balls_selected:
                 self.balls_selected.add(ball_instance)
