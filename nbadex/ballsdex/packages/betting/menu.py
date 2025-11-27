@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, AsyncIterator, List, Set, cast
 
@@ -331,8 +332,25 @@ class BetMenu:
             if self.task and not self.task.cancelled():
                 self.task.cancel()
 
-            self.embed.description = "Bet concluded!"
-            self.embed.colour = discord.Colour.green()
+            # Randomly select winner and perform bet resolution
+            winner_is_bettor1 = random.choice([True, False])
+            winner = self.bettor1 if winner_is_bettor1 else self.bettor2
+            loser = self.bettor2 if winner_is_bettor1 else self.bettor1
+
+            # Transfer loser's NBAs to winner
+            try:
+                for nba in loser.proposal:
+                    nba.player = winner.player
+                    await nba.save()
+            except Exception as e:
+                log.error(f"Error transferring NBAs: {e}")
+                self.embed.description = "Error concluding bet!"
+                self.embed.colour = discord.Colour.red()
+                result = False
+            else:
+                self.embed.description = f"🎉 {winner.user.name} won the bet!"
+                self.embed.colour = discord.Colour.green()
+
             self.current_view.stop()
             for item in self.current_view.children:
                 item.disabled = True  # type: ignore
