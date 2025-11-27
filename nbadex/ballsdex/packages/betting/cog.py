@@ -362,7 +362,7 @@ class Bet(commands.GroupCog):
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
             user = interaction.user
-            sort_value = sorting.value if sorting else "-bet_date"
+            sort_direction = "DESC" if (sorting and sorting.value.startswith("-")) else "ASC"
 
             if days is not None and days < 0:
                 await interaction.followup.send(
@@ -370,22 +370,24 @@ class Bet(commands.GroupCog):
                 )
                 return
 
+            # Build the query
+            where_clause = f"(player1_id = {user.id} OR player2_id = {user.id})"
+            
             if trade_user:
-                queryset = BetHistory.filter(
-                    (Q(player1_id=user.id, player2_id=trade_user.id))
-                    | (Q(player1_id=trade_user.id, player2_id=user.id))
-                )
-            else:
-                queryset = BetHistory.filter(
-                    Q(player1_id=user.id) | Q(player2_id=user.id)
+                where_clause = (
+                    f"((player1_id = {user.id} AND player2_id = {trade_user.id}) "
+                    f"OR (player1_id = {trade_user.id} AND player2_id = {user.id}))"
                 )
 
             if days is not None and days > 0:
                 end_date = datetime.datetime.now()
                 start_date = end_date - datetime.timedelta(days=days)
-                queryset = queryset.filter(bet_date__range=(start_date, end_date))
+                where_clause += f" AND bet_date BETWEEN '{start_date}' AND '{end_date}'"
 
-            history = await queryset.order_by(sort_value)
+            # Execute raw query
+            history = await BetHistory.raw(
+                f"SELECT * FROM bethistory WHERE {where_clause} ORDER BY bet_date {sort_direction}"
+            )
 
             if not history:
                 await interaction.followup.send("You have no betting history.", ephemeral=True)
@@ -396,12 +398,9 @@ class Bet(commands.GroupCog):
             await pages.start()
         except Exception as e:
             log.error(f"Error in /bet history: {e}", exc_info=True)
-            try:
-                await interaction.followup.send(
-                    f"Error loading history: {str(e)}", ephemeral=True
-                )
-            except:
-                pass
+            await interaction.followup.send(
+                f"Error loading history: {str(e)}", ephemeral=True
+            )
 
 
 async def setup(bot: "BallsDexBot"):
