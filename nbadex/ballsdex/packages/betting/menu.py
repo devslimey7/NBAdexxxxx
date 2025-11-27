@@ -325,6 +325,8 @@ class BetMenu:
 
     async def confirm(self, bettor: BettingUser) -> bool:
         """Mark a user's proposal as accepted. If both users accept, end the bet now"""
+        from ballsdex.core.models import BetHistory
+        
         result = True
         bettor.accepted = True
         fill_bet_embed_fields(self.embed, self.bot, self.bettor1, self.bettor2)
@@ -342,6 +344,16 @@ class BetMenu:
                 for nba in loser.proposal:
                     nba.player = winner.player
                     await nba.save()
+                
+                # Save bet to history
+                await BetHistory.create(
+                    player1_id=self.bettor1.player.discord_id,
+                    player2_id=self.bettor2.player.discord_id,
+                    winner_id=winner.player.discord_id,
+                    player1_count=len(self.bettor1.proposal),
+                    player2_count=len(self.bettor2.proposal),
+                    cancelled=False,
+                )
             except Exception as e:
                 log.error(f"Error transferring NBAs: {e}")
                 self.embed.description = "Error concluding bet!"

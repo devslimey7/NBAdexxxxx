@@ -1,14 +1,17 @@
+import datetime
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from cachetools import TTLCache
 from discord import app_commands
 from discord.ext import commands
+from tortoise.expressions import Q
 
-from ballsdex.core.models import BallInstance, Player
+from ballsdex.core.models import BallInstance, BetHistory, Player
 from ballsdex.core.utils.buttons import ConfirmChoiceView
+from ballsdex.core.utils.paginator import Pages
 from ballsdex.core.utils.sorting import FilteringChoices, SortingChoices, filter_balls, sort_balls
 from ballsdex.core.utils.transformers import (
     BallEnabledTransform,
@@ -16,6 +19,7 @@ from ballsdex.core.utils.transformers import (
     SpecialEnabledTransform,
 )
 from ballsdex.packages.betting.betting_user import BettingUser
+from ballsdex.packages.betting.display import BetHistoryFormat
 from ballsdex.packages.betting.menu import BetMenu
 
 if TYPE_CHECKING:
@@ -330,29 +334,81 @@ class Bet(commands.GroupCog):
             log.error(f"Error bulk adding NBAs: {e}", exc_info=True)
 
     @app_commands.command()
-    @app_commands.check(betting_channel_check)
+    @app_commands.choices(
+        sorting=[
+            app_commands.Choice(name="Most Recent", value="-bet_date"),
+            app_commands.Choice(name="Oldest", value="bet_date"),
+        ]
+    )
     async def history(
         self,
         interaction: discord.Interaction["BallsDexBot"],
-        days: int | None = None,
+        sorting: app_commands.Choice[str] | None = None,
+        trade_user: discord.User | None = None,
+        days: Optional[int] = None,
+        ball: BallEnabledTransform | None = None,
+        special: SpecialEnabledTransform | None = None,
     ):
         """
-        View your betting history (placeholder for future implementation).
+        View your betting history with pagination and filtering.
 
         Parameters
         ----------
-        days: int
-            Number of days of history to show (default: 7)
+        sorting: str | None
+            The sorting order of the bets (Most Recent or Oldest).
+        trade_user: discord.User | None
+            The user you want to see your bet history with.
+        days: Optional[int]
+            Retrieve bet history from last x days.
+        ball: BallEnabledTransform | None
+            The NBA to filter the bet history by.
+        special: SpecialEnabledTransform | None
+            The special to filter the bet history by.
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
+        user = interaction.user
+        sort_value = sorting.value if sorting else "-bet_date"
 
-        embed = discord.Embed(
-            title="Your Betting History",
-            color=discord.Color.blue(),
+        if days is not None and days < 0:
+            await interaction.followup.send(
+                "Invalid number of days. Please provide a non-negative value.", ephemeral=True
+            )
+            return
+
+        if trade_user:
+            queryset = BetHistory.filter(
+                (Q(player1_id=user.id, player2_id=trade_user.id))
+                | (Q(player1_id=trade_user.id, player2_id=user.id))
+            )
+        else:
+            queryset = BetHistory.filter(
+                Q(player1_id=user.id) | Q(player2_id=user.id)
+            )
+
+        if days is not None and days > 0:
+            end_date = datetime.datetime.now()
+            start_date = end_date - datetime.timedelta(days=days)
+            queryset = queryset.filter(bet_date__range=(start_date, end_date))
+
+        if ball:
+            queryset = queryset.filter(Q(betstakes__ballinstance__ball=ball)).distinct()
+        if special:
+            queryset = queryset.filter(Q(betstakes__ballinstance__special=special)).distinct()
+
+        history = await queryset.order_by(sort_value).prefetch_related(
+            "player1",
+            "player2",
+            "betstakes__ballinstance__ball",
+            "betstakes__ballinstance__special",
         )
-        embed.description = "No betting history available yet."
-        embed.set_footer(text="Total: 0 bets")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+
+        if not history:
+            await interaction.followup.send("No history found.", ephemeral=True)
+            return
+
+        source = BetHistoryFormat(history, interaction.user.name, self.bot)
+        pages = Pages(source=source, interaction=interaction)
+        await pages.start()
 
 
 async def setup(bot: "BallsDexBot"):
