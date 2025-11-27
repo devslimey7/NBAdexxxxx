@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 from tortoise.expressions import Q
 
-from ballsdex.core.models import BallInstance, BetHistory, Player
+from ballsdex.core.models import BallInstance, Player
 from ballsdex.core.utils.buttons import ConfirmChoiceView
 from ballsdex.core.utils.paginator import Pages
 from ballsdex.core.utils.sorting import FilteringChoices, SortingChoices, filter_balls, sort_balls
@@ -19,7 +19,6 @@ from ballsdex.core.utils.transformers import (
     SpecialEnabledTransform,
 )
 from ballsdex.packages.betting.betting_user import BettingUser
-from ballsdex.packages.betting.display import BetHistoryFormat
 from ballsdex.packages.betting.menu import BetMenu
 
 if TYPE_CHECKING:
@@ -332,20 +331,6 @@ class Bet(commands.GroupCog):
         except Exception as e:
             await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
             log.error(f"Error bulk adding NBAs: {e}", exc_info=True)
-
-    @app_commands.command()
-    async def history(
-        self,
-        interaction: discord.Interaction["BallsDexBot"],
-    ):
-        """
-        View your betting history (coming soon).
-        """
-        await interaction.response.send_message(
-            "Betting history is coming soon! Your bets are being tracked in the background.",
-            ephemeral=True
-        )
-
 
 async def setup(bot: "BallsDexBot"):
     await bot.add_cog(Bet(bot))
