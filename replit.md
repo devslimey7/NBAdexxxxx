@@ -10,8 +10,18 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
 
-# Recent Changes (Session: Nov 25, 2025)
+# Recent Changes (Session: Nov 27, 2025)
 
+- **BETTING SYSTEM IMPLEMENTED**: Complete betting system with 7 commands
+  - New database models: `Bet`, `BetStake`, `BetHistory` (Tortoise ORM)
+  - 7 betting commands: `/bet begin`, `/bet add`, `/bet remove`, `/bet view`, `/bet cancel`, `/bet bulk add`, `/bet history`
+  - Commands only available in betting channel (1443544409684836382) in admin guild (1440962506796433519)
+  - Each command uses `@app_commands.check(betting_channel_check)` to enforce restrictions
+  - Betting system uses in-memory state management (TTL Cache for active bets)
+  - Full filtering and sorting support in `/bet history` (days, sorting, trade_user, footdex, special)
+  - Created new cog package: `ballsdex.packages.betting`
+
+# Previous Session (Nov 25, 2025)
 - **COMPLETE REMOVAL OF COINS SYSTEM**: Dropped `coins` column from database and removed all economy-related code
   - Fixed database integrity constraint violation (NOT NULL on coins field)
   - Removed all `coins=0` workarounds from 18 Player.get_or_create() calls across codebase
@@ -57,6 +67,9 @@ Database Management: Clean up unused fields and systems entirely rather than usi
 - `BallInstance`: Individual cards owned by players
 - `Player`: Discord users who collect cards
 - `Trade`: Trading system between players
+- `Bet`: Betting records (player1, player2, winner, started_at, ended_at, cancelled)
+- `BetStake`: Individual NBAs staked in a bet (references Bet, Player, BallInstance)
+- `BetHistory`: Permanent history of completed/cancelled bets
 - `Special`: Special event cards (e.g., shiny variants)
 - `GuildConfig`: Server-specific settings
 - `BlacklistedID/BlacklistedGuild`: Moderation system
@@ -73,6 +86,7 @@ Database Management: Clean up unused fields and systems entirely rather than usi
 - `Admin`: Administrative commands for bot owners/staff
 - `Config`: Server configuration and setup
 - `Trade`: Trading system between players
+- `Betting`: Betting system with 7 commands (NEW)
 
 ### Spawn System
 

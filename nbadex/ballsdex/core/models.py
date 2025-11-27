@@ -600,3 +600,74 @@ class Block(models.Model):
 
     def __str__(self) -> str:
         return str(self.pk)
+
+
+class Bet(models.Model):
+    id: int
+    player1: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="bets_initiated"
+    )
+    player2: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="bets_received"
+    )
+    started_at = fields.DatetimeField(auto_now_add=True)
+    ended_at = fields.DatetimeField(null=True, default=None)
+    winner: fields.ForeignKeyRelation[Player] | None = fields.ForeignKeyField(
+        "models.Player", related_name="bets_won", null=True, default=None
+    )
+    cancelled = fields.BooleanField(default=False)
+    betstakes: fields.ReverseRelation[BetStake]
+
+    def __str__(self) -> str:
+        return str(self.pk)
+
+    class Meta:
+        indexes = [
+            PostgreSQLIndex(fields=("player1_id",)),
+            PostgreSQLIndex(fields=("player2_id",)),
+            PostgreSQLIndex(fields=("started_at",)),
+        ]
+
+
+class BetStake(models.Model):
+    id: int
+    bet: fields.ForeignKeyRelation[Bet] = fields.ForeignKeyField(
+        "models.Bet", related_name="betstakes"
+    )
+    player: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="betstakes"
+    )
+    ballinstance: fields.ForeignKeyRelation[BallInstance] = fields.ForeignKeyField(
+        "models.BallInstance", related_name="betstakes"
+    )
+
+    def __str__(self) -> str:
+        return str(self.pk)
+
+    class Meta:
+        indexes = [
+            PostgreSQLIndex(fields=("ballinstance_id",)),
+            PostgreSQLIndex(fields=("player_id",)),
+            PostgreSQLIndex(fields=("bet_id",)),
+        ]
+
+
+class BetHistory(models.Model):
+    id: int
+    player1_id = fields.BigIntField()
+    player2_id = fields.BigIntField()
+    winner_id = fields.BigIntField(null=True, default=None)
+    bet_date = fields.DatetimeField(auto_now_add=True)
+    player1_count = fields.IntField(default=0)
+    player2_count = fields.IntField(default=0)
+    cancelled = fields.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return str(self.pk)
+
+    class Meta:
+        indexes = [
+            PostgreSQLIndex(fields=("player1_id",)),
+            PostgreSQLIndex(fields=("player2_id",)),
+            PostgreSQLIndex(fields=("bet_date",)),
+        ]
