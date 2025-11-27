@@ -442,7 +442,7 @@ class BallsSelector(Pages):
         self, interaction: discord.Interaction["BallsDexBot"], button: Button
     ):
         await interaction.response.defer(thinking=True, ephemeral=True)
-        bet, bettor = self.cog.get_bet(self.interaction)
+        bet, bettor = self.cog.get_bet(interaction)
         if bet is None or bettor is None:
             return await interaction.followup.send(
                 "The bet has been cancelled or the user is not part of the bet.",
