@@ -4,8 +4,10 @@ from discord.ext import commands
 from typing import TYPE_CHECKING
 from datetime import datetime, timedelta
 
+from tortoise.expressions import Q
+
 from ballsdex.core.models import Player, BallInstance, Bet, BetStake, BetHistory
-from ballsdex.core.utils.transformers import BallInstanceTransform
+from ballsdex.core.utils.transformers import BallInstanceTransform, SpecialEnabledTransform
 from ballsdex.settings import settings
 
 if TYPE_CHECKING:
@@ -90,6 +92,7 @@ class Betting(commands.GroupCog):
         self,
         interaction: discord.Interaction,
         nba: BallInstanceTransform,
+        special: SpecialEnabledTransform | None = None,
     ):
         """Add an NBA to your ongoing bet."""
         await interaction.response.defer(ephemeral=True)
@@ -142,6 +145,7 @@ class Betting(commands.GroupCog):
         self,
         interaction: discord.Interaction,
         nba: BallInstanceTransform,
+        special: SpecialEnabledTransform | None = None,
     ):
         """Remove an NBA from your stakes in the ongoing bet."""
         await interaction.response.defer(ephemeral=True)
@@ -345,7 +349,7 @@ class Betting(commands.GroupCog):
             history_items = await BetHistory.filter(
                 bet_date__gte=cutoff_date,
             ).filter(
-                player1_id == interaction.user.id | player2_id == interaction.user.id
+                Q(player1_id=interaction.user.id) | Q(player2_id=interaction.user.id)
             ).order_by("-bet_date").limit(10)
 
             if not history_items:
