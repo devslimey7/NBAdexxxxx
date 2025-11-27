@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import discord
@@ -9,15 +9,14 @@ from discord.ext import commands
 
 from ballsdex.core.models import BallInstance, Player
 from ballsdex.core.utils.buttons import ConfirmChoiceView
-from ballsdex.core.utils.paginator import Pages
 from ballsdex.core.utils.sorting import FilteringChoices, SortingChoices, filter_balls, sort_balls
 from ballsdex.core.utils.transformers import (
     BallEnabledTransform,
     BallInstanceTransform,
     SpecialEnabledTransform,
 )
-from ballsdex.packages.betting.display import BetStakesSource
-from ballsdex.packages.betting.menu import BetView
+from ballsdex.packages.betting.betting_user import BettingUser
+from ballsdex.packages.betting.menu import BetMenu
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
@@ -41,7 +40,54 @@ class Bet(commands.GroupCog):
 
     def __init__(self, bot: "BallsDexBot"):
         self.bot = bot
-        self.active_bets: TTLCache[tuple[int, int], dict] = TTLCache(maxsize=999999, ttl=1800)
+        self.bets: TTLCache[int, dict[int, list[BetMenu]]] = TTLCache(maxsize=999999, ttl=1800)
+
+    def get_bet(
+        self,
+        interaction: discord.Interaction["BallsDexBot"] | None = None,
+        *,
+        channel: discord.TextChannel | None = None,
+        user: discord.User | discord.Member = None,
+    ) -> tuple[BetMenu, BettingUser] | tuple[None, None]:
+        """Find an ongoing bet for the given interaction."""
+        guild: discord.Guild
+        if interaction:
+            guild = interaction.guild
+            channel = interaction.channel
+            user = interaction.user
+        elif channel:
+            guild = channel.guild
+        else:
+            raise TypeError("Missing interaction or channel")
+
+        if guild.id not in self.bets:
+            self.bets[guild.id] = defaultdict(list)
+        if channel.id not in self.bets[guild.id]:
+            return (None, None)
+        
+        to_remove: list[BetMenu] = []
+        for bet in self.bets[guild.id][channel.id]:
+            if (
+                bet.current_view.is_finished()
+                or bet.bettor1.cancelled
+                or bet.bettor2.cancelled
+            ):
+                to_remove.append(bet)
+                continue
+            try:
+                bettor = bet._get_bettor(user)
+            except RuntimeError:
+                continue
+            else:
+                break
+        else:
+            for bet in to_remove:
+                self.bets[guild.id][channel.id].remove(bet)
+            return (None, None)
+
+        for bet in to_remove:
+            self.bets[guild.id][channel.id].remove(bet)
+        return (bet, bettor)
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -63,42 +109,28 @@ class Bet(commands.GroupCog):
             )
             return
 
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        player1, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        player2, _ = await Player.get_or_create(discord_id=user.id)
 
-        try:
-            player1, _ = await Player.get_or_create(discord_id=interaction.user.id)
-            player2, _ = await Player.get_or_create(discord_id=user.id)
-        except Exception as e:
-            await interaction.followup.send(f"Error creating players: {str(e)}", ephemeral=True)
+        bet1, bettor1 = self.get_bet(interaction)
+        bet2, bettor2 = self.get_bet(channel=interaction.channel, user=user)  # type: ignore
+        if bet1 or bettor1:
+            await interaction.response.send_message(
+                "You already have an ongoing bet.", ephemeral=True
+            )
             return
-
-        bet_key = (interaction.user.id, user.id)
-        if bet_key in self.active_bets:
-            await interaction.followup.send(
-                "You already have an active bet with this user!", ephemeral=True
+        if bet2 or bettor2:
+            await interaction.response.send_message(
+                "The user you are trying to bet with is already in a bet.", ephemeral=True
             )
             return
 
-        # Create in-memory bet
-        bet_data = {
-            "player1": player1,
-            "player2": player2,
-            "player1_stakes": [],
-            "player2_stakes": [],
-            "started_at": discord.utils.utcnow(),
-        }
-        self.active_bets[bet_key] = bet_data
-
-        # Create interactive view
-        view = BetView(bet_data, self)
-        embed = discord.Embed(
-            title="Bet Started!",
-            description=f"Bet started between {interaction.user.mention} and {user.mention}",
-            color=discord.Color.green(),
+        menu = BetMenu(
+            self, interaction, BettingUser(interaction.user, player1), BettingUser(user, player2)
         )
-        embed.add_field(name="Use Commands", value="`/bet add` - Add NBAs\n`/bet remove` - Remove NBAs\n`/bet view` - See stakes", inline=False)
-        
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        self.bets[interaction.guild.id][interaction.channel.id].append(menu)  # type: ignore
+        await menu.start()
+        await interaction.response.send_message("Bet started!", ephemeral=True)
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -109,28 +141,34 @@ class Bet(commands.GroupCog):
         special: SpecialEnabledTransform | None = None,
     ):
         """
-        Add an NBA to your bet.
+        Add an NBA to the ongoing bet.
 
         Parameters
         ----------
         nba: BallInstance
-            The NBA you want to add to your bet
+            The NBA you want to add to your proposal
         special: Special
             Filter the results of autocompletion to a special event. Ignored afterwards.
         """
         if not nba:
             return
-
         await interaction.response.defer(ephemeral=True, thinking=True)
-
-        active_bet = None
-        for key, bet_data in self.active_bets.items():
-            if interaction.user.id in key:
-                active_bet = bet_data
-                break
-
-        if not active_bet:
-            await interaction.followup.send("You do not have an active bet.", ephemeral=True)
+        
+        bet, bettor = self.get_bet(interaction)
+        if not bet or not bettor:
+            await interaction.followup.send("You do not have an ongoing bet.", ephemeral=True)
+            return
+        
+        if bettor.locked:
+            await interaction.followup.send(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the bet instead.",
+                ephemeral=True,
+            )
+            return
+        
+        if nba in bettor.proposal:
+            await interaction.followup.send("You already have this NBA in your proposal.", ephemeral=True)
             return
 
         if nba.favorite:
@@ -148,22 +186,8 @@ class Bet(commands.GroupCog):
             if not view.value:
                 return
 
-        try:
-            stakes = (
-                active_bet["player1_stakes"]
-                if interaction.user.id == active_bet["player1"].discord_id
-                else active_bet["player2_stakes"]
-            )
-            
-            # Check for duplicates
-            if nba not in stakes:
-                stakes.append(nba)
-                await interaction.followup.send(f"{nba.ball.country} added to bet.", ephemeral=True)
-            else:
-                await interaction.followup.send(f"{nba.ball.country} already in your bet.", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"Error adding NBA to bet: {str(e)}", ephemeral=True)
-            log.error(f"Error adding NBA to bet: {e}", exc_info=True)
+        bettor.proposal.append(nba)
+        await interaction.followup.send("NBA added to your proposal.", ephemeral=True)
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
@@ -174,121 +198,65 @@ class Bet(commands.GroupCog):
         special: SpecialEnabledTransform | None = None,
     ):
         """
-        Remove an NBA from your bet.
+        Remove an NBA from the ongoing bet.
 
         Parameters
         ----------
         nba: BallInstance
-            The NBA you want to remove from your bet
+            The NBA you want to remove from your proposal
         special: Special
             Filter the results of autocompletion to a special event. Ignored afterwards.
         """
         if not nba:
             return
-
+        
         await interaction.response.defer(ephemeral=True, thinking=True)
-
-        active_bet = None
-        for key, bet_data in self.active_bets.items():
-            if interaction.user.id in key:
-                active_bet = bet_data
-                break
-
-        if not active_bet:
-            await interaction.followup.send("You do not have an active bet.", ephemeral=True)
+        
+        bet, bettor = self.get_bet(interaction)
+        if not bet or not bettor:
+            await interaction.followup.send("You do not have an ongoing bet.", ephemeral=True)
             return
-
-        try:
-            stakes = (
-                active_bet["player1_stakes"]
-                if interaction.user.id == active_bet["player1"].discord_id
-                else active_bet["player2_stakes"]
+        
+        if bettor.locked:
+            await interaction.followup.send(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the bet instead.",
+                ephemeral=True,
             )
-            
-            if nba in stakes:
-                stakes.remove(nba)
-                await interaction.followup.send("NBA removed from bet.", ephemeral=True)
-            else:
-                await interaction.followup.send("NBA not found in your bet.", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"Error removing NBA from bet: {str(e)}", ephemeral=True)
-            log.error(f"Error removing NBA from bet: {e}", exc_info=True)
+            return
+        
+        if nba in bettor.proposal:
+            bettor.proposal.remove(nba)
+            await interaction.followup.send("NBA removed from your proposal.", ephemeral=True)
+        else:
+            await interaction.followup.send("NBA not found in your proposal.", ephemeral=True)
 
     @app_commands.command()
     @app_commands.check(betting_channel_check)
     async def view(self, interaction: discord.Interaction["BallsDexBot"]):
         """
-        View your current bet stakes with pagination.
+        View your current bet proposal.
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        active_bet = None
-        for key, bet_data in self.active_bets.items():
-            if interaction.user.id in key:
-                active_bet = bet_data
-                break
-
-        if not active_bet:
-            await interaction.followup.send("You do not have an active bet.", ephemeral=True)
+        bet, bettor = self.get_bet(interaction)
+        if not bet or not bettor:
+            await interaction.followup.send("You do not have an ongoing bet.", ephemeral=True)
             return
 
-        try:
-            stakes = (
-                active_bet["player1_stakes"]
-                if interaction.user.id == active_bet["player1"].discord_id
-                else active_bet["player2_stakes"]
-            )
-
-            if not stakes:
-                await interaction.followup.send("You have no NBAs in your bet.", ephemeral=True)
-                return
-
-            # Create paginator
-            source = BetStakesSource(stakes, interaction.user.name, self.bot)
-            pages = Pages(source, ctx=interaction)
-            await pages.start()
-        except Exception as e:
-            await interaction.followup.send(f"Error viewing bet: {str(e)}", ephemeral=True)
-            log.error(f"Error viewing bet: {e}", exc_info=True)
-
-    @app_commands.command()
-    @app_commands.check(betting_channel_check)
-    async def cancel(self, interaction: discord.Interaction["BallsDexBot"]):
-        """
-        Cancel your active bet.
-        """
-        await interaction.response.defer(ephemeral=True, thinking=True)
-
-        active_bet = None
-        bet_key = None
-        for key, bet_data in self.active_bets.items():
-            if interaction.user.id in key:
-                active_bet = bet_data
-                bet_key = key
-                break
-
-        if not active_bet:
-            await interaction.followup.send("You do not have an active bet.", ephemeral=True)
-            return
-
-        view = ConfirmChoiceView(
-            interaction,
-            accept_message="Cancelling bet...",
-            cancel_message="This request has been cancelled.",
+        embed = discord.Embed(
+            title="Your Bet Proposal",
+            color=discord.Color.blue(),
         )
-        await interaction.followup.send(
-            "Are you sure you want to cancel this bet?", view=view, ephemeral=True
-        )
-        await view.wait()
-        if not view.value:
-            return
 
-        try:
-            del self.active_bets[bet_key]
-            await interaction.followup.send("Bet cancelled.", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"Error cancelling bet: {str(e)}", ephemeral=True)
-            log.error(f"Error cancelling bet: {e}", exc_info=True)
+        if bettor.proposal:
+            lines = [f"- {nba.description(short=True, include_emoji=True, bot=self.bot, is_trade=True)}" for nba in bettor.proposal]
+            embed.description = "\n".join(lines)
+        else:
+            embed.description = "*Empty*"
+
+        embed.set_footer(text=f"Total: {len(bettor.proposal)} NBAs")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     bulk = app_commands.Group(name="bulk", description="Bulk betting commands")
 
@@ -318,14 +286,17 @@ class Bet(commands.GroupCog):
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        active_bet = None
-        for key, bet_data in self.active_bets.items():
-            if interaction.user.id in key:
-                active_bet = bet_data
-                break
+        bet, bettor = self.get_bet(interaction)
+        if not bet or not bettor:
+            await interaction.followup.send("You do not have an ongoing bet.", ephemeral=True)
+            return
 
-        if not active_bet:
-            await interaction.followup.send("You do not have an active bet.", ephemeral=True)
+        if bettor.locked:
+            await interaction.followup.send(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the bet instead.",
+                ephemeral=True,
+            )
             return
 
         try:
@@ -346,22 +317,13 @@ class Bet(commands.GroupCog):
                 )
                 return
 
-            stakes = (
-                active_bet["player1_stakes"]
-                if interaction.user.id == active_bet["player1"].discord_id
-                else active_bet["player2_stakes"]
-            )
-            
-            # Add all matching NBAs (skip duplicates)
-            created_count = 0
+            added = 0
             for nba_instance in nbas:
-                if nba_instance not in stakes:
-                    stakes.append(nba_instance)
-                    created_count += 1
+                if nba_instance not in bettor.proposal:
+                    bettor.proposal.append(nba_instance)
+                    added += 1
 
-            await interaction.followup.send(
-                f"Added {created_count} NBAs to your bet.", ephemeral=True
-            )
+            await interaction.followup.send(f"Added {added} NBAs to your proposal.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"Error adding NBAs: {str(e)}", ephemeral=True)
             log.error(f"Error bulk adding NBAs: {e}", exc_info=True)
