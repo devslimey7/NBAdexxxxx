@@ -605,15 +605,15 @@ class Block(models.Model):
 class Bet(models.Model):
     id: int
     player1: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
-        "models.Player", related_name="bets_initiated"
+        "models.Player", related_name="bets_initiated", on_delete="CASCADE"
     )
     player2: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
-        "models.Player", related_name="bets_received"
+        "models.Player", related_name="bets_received", on_delete="CASCADE"
     )
     started_at = fields.DatetimeField(auto_now_add=True)
     ended_at = fields.DatetimeField(null=True, default=None)
     winner: fields.ForeignKeyRelation[Player] | None = fields.ForeignKeyField(
-        "models.Player", related_name="bets_won", null=True, default=None
+        "models.Player", related_name="bets_won", null=True, default=None, on_delete="SET NULL"
     )
     cancelled = fields.BooleanField(default=False)
     betstakes: fields.ReverseRelation[BetStake]
@@ -632,13 +632,13 @@ class Bet(models.Model):
 class BetStake(models.Model):
     id: int
     bet: fields.ForeignKeyRelation[Bet] = fields.ForeignKeyField(
-        "models.Bet", related_name="betstakes"
+        "models.Bet", related_name="betstakes", on_delete="CASCADE"
     )
     player: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
-        "models.Player", related_name="betstakes"
+        "models.Player", related_name="betstakes", on_delete="CASCADE"
     )
     ballinstance: fields.ForeignKeyRelation[BallInstance] = fields.ForeignKeyField(
-        "models.BallInstance", related_name="betstakes"
+        "models.BallInstance", related_name="betstakes", on_delete="CASCADE"
     )
 
     def __str__(self) -> str:
