@@ -12,10 +12,20 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Dec 19, 2025)
 
+- **TRADE SYSTEM EXPANDED**: Full support for trading coins and packs
+  - `/trade coins add <amount>` - Add coins to your trade proposal
+  - `/trade coins remove <amount>` - Remove coins from your trade proposal
+  - `/trade pack add <pack> [amount]` - Add packs to your trade proposal (with autocomplete)
+  - `/trade pack remove <pack> [amount]` - Remove packs from your trade proposal
+  - Trade display now shows coins and packs being offered
+  - Atomic coin/pack transfers with validation during trade execution
+  - Fixed autocomplete timeout errors with proper error handling
+
 - **BUG FIXES APPLIED**:
   - **Fixed pack opening card count**: Packs now correctly give `cards_count` number of NBAs per pack (e.g., a 5-card pack gives 5 NBAs)
   - **Fixed admin pack quantity doubling**: Admin `/admin packs add` command no longer doubles quantities when adding packs
   - **Fixed daily limit tracking**: Daily limits are now tracked per pack opened, not per card received
+  - **Fixed trade autocomplete timeouts**: Autocomplete now has error handling to prevent "already acknowledged" errors
 
 - **NEW USER COMMANDS**:
   - `/coins balance` - Now only shows your own balance (removed ability to view others)
