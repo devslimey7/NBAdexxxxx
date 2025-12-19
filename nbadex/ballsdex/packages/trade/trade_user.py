@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     import discord
 
     from ballsdex.core.bot import BallsDexBot
-    from ballsdex.core.models import BallInstance, Player, Trade
+    from ballsdex.core.models import BallInstance, Pack, Player, Trade
 
 
 @dataclass(slots=True)
@@ -15,6 +15,8 @@ class TradingUser:
     user: "discord.User | discord.Member"
     player: "Player"
     proposal: list["BallInstance"] = field(default_factory=list)
+    coins: int = 0
+    packs: dict["Pack", int] = field(default_factory=dict)
     locked: bool = False
     cancelled: bool = False
     accepted: bool = False

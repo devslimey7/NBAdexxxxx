@@ -117,8 +117,12 @@ class ModelTransformer(app_commands.Transformer, Generic[T]):
     ) -> list[app_commands.Choice[int]]:
         t1 = time.time()
         choices: list[app_commands.Choice[int]] = []
-        for option in await self.get_options(interaction, value):
-            choices.append(option)
+        try:
+            for option in await self.get_options(interaction, value):
+                choices.append(option)
+        except Exception as e:
+            log.warning(f"{self.name.title()} autocompletion failed: {e}")
+            return []
         t2 = time.time()
         log.debug(
             f"{self.name.title()} autocompletion took "
