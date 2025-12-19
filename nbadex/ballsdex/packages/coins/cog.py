@@ -594,35 +594,37 @@ class Packs(commands.GroupCog, group_name="pack"):
                 special_to_use = the_pack.special
             
             for _ in range(amount):
-                roll = random.uniform(0, total_rarity)
-                cumulative = 0
-                selected_ball = available_balls[0]
-                
-                for ball in available_balls:
-                    cumulative += ball.rarity
-                    if roll <= cumulative:
-                        selected_ball = ball
-                        break
-                
-                attack_bonus = random.randint(-settings.max_attack_bonus, settings.max_attack_bonus)
-                health_bonus = random.randint(-settings.max_health_bonus, settings.max_health_bonus)
-                
-                instance = await BallInstance.create(
-                    ball=selected_ball,
-                    player=player,
-                    attack_bonus=attack_bonus,
-                    health_bonus=health_bonus,
-                    special=special_to_use,
-                    server_id=interaction.guild_id if interaction.guild else None,
-                )
+                pack_cards = []
+                for _ in range(the_pack.cards_count):
+                    roll = random.uniform(0, total_rarity)
+                    cumulative = 0
+                    selected_ball = available_balls[0]
+                    
+                    for ball in available_balls:
+                        cumulative += ball.rarity
+                        if roll <= cumulative:
+                            selected_ball = ball
+                            break
+                    
+                    attack_bonus = random.randint(-settings.max_attack_bonus, settings.max_attack_bonus)
+                    health_bonus = random.randint(-settings.max_health_bonus, settings.max_health_bonus)
+                    
+                    instance = await BallInstance.create(
+                        ball=selected_ball,
+                        player=player,
+                        attack_bonus=attack_bonus,
+                        health_bonus=health_bonus,
+                        special=special_to_use,
+                        server_id=interaction.guild_id if interaction.guild else None,
+                    )
+                    pack_cards.append(instance)
+                    results.append(instance)
                 
                 await PackOpenHistory.create(
                     player=player,
                     pack=the_pack,
-                    ball_received=instance
+                    ball_received=pack_cards[0] if pack_cards else None
                 )
-                
-                results.append(instance)
         
         emoji = the_pack.emoji + " " if the_pack.emoji else ""
         

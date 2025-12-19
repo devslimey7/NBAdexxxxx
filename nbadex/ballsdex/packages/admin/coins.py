@@ -215,16 +215,21 @@ class PacksAdmin(app_commands.Group):
             await interaction.response.send_message("Amount must be positive!", ephemeral=True)
             return
 
-        player, _ = await Player.get_or_create(discord_id=user.id)
-        
-        player_pack, _ = await PlayerPack.get_or_create(
-            player=player,
-            pack=pack,
-            defaults={"quantity": 0}
-        )
-        old_quantity = player_pack.quantity
-        player_pack.quantity += amount
-        await player_pack.save(update_fields=["quantity"])
+        async with in_transaction():
+            player, _ = await Player.get_or_create(discord_id=user.id)
+            
+            player_pack = await PlayerPack.filter(player=player, pack=pack).first()
+            if player_pack:
+                old_quantity = player_pack.quantity
+                player_pack.quantity += amount
+                await player_pack.save(update_fields=["quantity"])
+            else:
+                old_quantity = 0
+                player_pack = await PlayerPack.create(
+                    player=player,
+                    pack=pack,
+                    quantity=amount
+                )
 
         emoji = pack.emoji + " " if pack.emoji else ""
         await interaction.response.send_message(

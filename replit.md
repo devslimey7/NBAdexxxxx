@@ -12,6 +12,11 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 
 # Recent Changes (Session: Dec 19, 2025)
 
+- **BUG FIXES APPLIED**:
+  - **Fixed pack opening card count**: Packs now correctly give `cards_count` number of NBAs per pack (e.g., a 5-card pack gives 5 NBAs)
+  - **Fixed admin pack quantity doubling**: Admin `/admin packs add` command no longer doubles quantities when adding packs
+  - **Fixed daily limit tracking**: Daily limits are now tracked per pack opened, not per card received
+
 - **PACKS & COINS ECONOMY SYSTEM FULLY OPERATIONAL**: Complete economy system with coins and pack features
   - **Player coins**: `coins` field on Player model (INTEGER, default 0)
   - **Quicksell values**: `quicksell_value` field on Ball model for selling NBAs
