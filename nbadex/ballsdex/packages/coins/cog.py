@@ -122,24 +122,79 @@ class Coins(commands.GroupCog, group_name="coins"):
         self.bot = bot
 
     @app_commands.command()
-    async def balance(self, interaction: discord.Interaction, user: Optional[discord.User] = None):
+    async def balance(self, interaction: discord.Interaction):
         """
-        Check your coins balance or another user's balance.
+        Check your coins balance.
+        """
+        player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        
+        embed = discord.Embed(
+            title="Coins Balance",
+            description=f"You have **{player.coins:,}** coins",
+            color=discord.Color.gold()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command()
+    async def give(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        amount: int,
+    ):
+        """
+        Give coins to another user.
 
         Parameters
         ----------
         user: discord.User
-            The user whose balance to check (optional)
+            The user you want to give coins to
+        amount: int
+            Number of coins to give
         """
-        target = user or interaction.user
-        player, _ = await Player.get_or_create(discord_id=target.id)
+        if user.id == interaction.user.id:
+            await interaction.response.send_message("You cannot give coins to yourself!", ephemeral=True)
+            return
         
-        embed = discord.Embed(
-            title="Coins Balance",
-            description=f"{target.mention} has **{player.coins:,}** coins",
-            color=discord.Color.gold()
+        if user.bot:
+            await interaction.response.send_message("You cannot give coins to bots!", ephemeral=True)
+            return
+        
+        if amount < 1:
+            await interaction.response.send_message("Amount must be at least 1!", ephemeral=True)
+            return
+        
+        player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+        
+        if player.coins < amount:
+            await interaction.response.send_message(
+                f"You don't have enough coins! You have **{player.coins:,}** coins.",
+                ephemeral=True
+            )
+            return
+        
+        async with in_transaction():
+            await player.refresh_from_db()
+            
+            if player.coins < amount:
+                await interaction.response.send_message(
+                    f"You no longer have enough coins!",
+                    ephemeral=True
+                )
+                return
+            
+            recipient, _ = await Player.get_or_create(discord_id=user.id)
+            
+            player.coins -= amount
+            recipient.coins += amount
+            await player.save(update_fields=["coins"])
+            await recipient.save(update_fields=["coins"])
+        
+        await interaction.response.send_message(
+            f"You gave **{amount:,}** coins to {user.mention}!\n"
+            f"Your new balance: **{player.coins:,}** coins",
+            ephemeral=True
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command()
     async def sell(
@@ -491,6 +546,81 @@ class Packs(commands.GroupCog, group_name="pack"):
             embed.description += f"{emoji}**{pp.pack.name}**: {pp.quantity}\n"
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command()
+    async def give(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        pack: app_commands.Transform[PlayerPack, OwnedPackTransform],
+        amount: int = 1,
+    ):
+        """
+        Give packs to another user.
+
+        Parameters
+        ----------
+        user: discord.User
+            The user you want to give packs to
+        pack: PlayerPack
+            The pack you want to give
+        amount: int
+            Number of packs to give (default: 1)
+        """
+        if user.id == interaction.user.id:
+            await interaction.response.send_message("You cannot give packs to yourself!", ephemeral=True)
+            return
+        
+        if user.bot:
+            await interaction.response.send_message("You cannot give packs to bots!", ephemeral=True)
+            return
+        
+        if amount < 1:
+            await interaction.response.send_message("Amount must be at least 1!", ephemeral=True)
+            return
+        
+        if amount > pack.quantity:
+            await interaction.response.send_message(
+                f"You only have **{pack.quantity}** of this pack!",
+                ephemeral=True
+            )
+            return
+        
+        await pack.fetch_related("pack", "player")
+        the_pack = pack.pack
+        
+        async with in_transaction():
+            await pack.refresh_from_db()
+            
+            if pack.quantity < amount:
+                await interaction.response.send_message(
+                    f"You no longer have enough packs!",
+                    ephemeral=True
+                )
+                return
+            
+            pack.quantity -= amount
+            await pack.save(update_fields=["quantity"])
+            
+            recipient, _ = await Player.get_or_create(discord_id=user.id)
+            
+            recipient_pack = await PlayerPack.filter(player=recipient, pack=the_pack).first()
+            if recipient_pack:
+                recipient_pack.quantity += amount
+                await recipient_pack.save(update_fields=["quantity"])
+            else:
+                await PlayerPack.create(
+                    player=recipient,
+                    pack=the_pack,
+                    quantity=amount
+                )
+        
+        emoji = the_pack.emoji + " " if the_pack.emoji else ""
+        await interaction.response.send_message(
+            f"You gave **{amount}x {emoji}{the_pack.name}** to {user.mention}!\n"
+            f"You now have **{pack.quantity}** of this pack.",
+            ephemeral=True
+        )
 
     @app_commands.command()
     async def open(
