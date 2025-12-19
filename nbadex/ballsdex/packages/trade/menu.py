@@ -10,7 +10,7 @@ from discord.ui import Button, View, button
 from discord.utils import format_dt, utcnow
 from tortoise import transactions
 
-from ballsdex.core.models import BallInstance, Player, Trade, TradeCooldownPolicy, TradeObject
+from ballsdex.core.models import BallInstance, Player, PlayerPack, Trade, TradeCooldownPolicy, TradeObject
 from ballsdex.core.utils import menus
 from ballsdex.core.utils.buttons import ConfirmChoiceView
 from ballsdex.core.utils.paginator import Pages
@@ -342,7 +342,13 @@ class TradeMenu:
         if self.trader1.locked and self.trader2.locked:
             if self.task:
                 self.task.cancel()
-            if not self.trader1.proposal and not self.trader2.proposal:
+            trader1_has_offer = (
+                self.trader1.proposal or self.trader1.coins > 0 or self.trader1.packs
+            )
+            trader2_has_offer = (
+                self.trader2.proposal or self.trader2.coins > 0 or self.trader2.packs
+            )
+            if not trader1_has_offer and not trader2_has_offer:
                 await self.cancel("Nothing has been proposed in the trade, it has been cancelled.")
                 return
             self.current_view.stop()
@@ -373,7 +379,6 @@ class TradeMenu:
         for countryball in self.trader1.proposal:
             await countryball.refresh_from_db()
             if countryball.player.discord_id != self.trader1.player.discord_id:
-                # This is a invalid mutation, the player is not the owner of the countryball
                 raise InvalidTradeOperation()
             countryball.player = self.trader2.player
             countryball.trade_player = self.trader1.player
@@ -386,7 +391,6 @@ class TradeMenu:
         for countryball in self.trader2.proposal:
             await countryball.refresh_from_db()
             if countryball.player.discord_id != self.trader2.player.discord_id:
-                # This is a invalid mutation, the player is not the owner of the countryball
                 raise InvalidTradeOperation()
             countryball.player = self.trader1.player
             countryball.trade_player = self.trader2.player
@@ -399,6 +403,54 @@ class TradeMenu:
         for countryball in valid_transferable_countryballs:
             await countryball.unlock()
             await countryball.save()
+
+        await self.trader1.player.refresh_from_db()
+        await self.trader2.player.refresh_from_db()
+
+        if self.trader1.coins > 0:
+            if self.trader1.player.coins < self.trader1.coins:
+                raise InvalidTradeOperation()
+            self.trader1.player.coins -= self.trader1.coins
+            self.trader2.player.coins += self.trader1.coins
+
+        if self.trader2.coins > 0:
+            if self.trader2.player.coins < self.trader2.coins:
+                raise InvalidTradeOperation()
+            self.trader2.player.coins -= self.trader2.coins
+            self.trader1.player.coins += self.trader2.coins
+
+        await self.trader1.player.save(update_fields=["coins"])
+        await self.trader2.player.save(update_fields=["coins"])
+
+        for pack_id, qty in self.trader1.packs.items():
+            sender_pack = await PlayerPack.filter(
+                player=self.trader1.player, pack_id=pack_id
+            ).first()
+            if not sender_pack or sender_pack.quantity < qty:
+                raise InvalidTradeOperation()
+            sender_pack.quantity -= qty
+            await sender_pack.save(update_fields=["quantity"])
+
+            receiver_pack, _ = await PlayerPack.get_or_create(
+                player=self.trader2.player, pack_id=pack_id, defaults={"quantity": 0}
+            )
+            receiver_pack.quantity += qty
+            await receiver_pack.save(update_fields=["quantity"])
+
+        for pack_id, qty in self.trader2.packs.items():
+            sender_pack = await PlayerPack.filter(
+                player=self.trader2.player, pack_id=pack_id
+            ).first()
+            if not sender_pack or sender_pack.quantity < qty:
+                raise InvalidTradeOperation()
+            sender_pack.quantity -= qty
+            await sender_pack.save(update_fields=["quantity"])
+
+            receiver_pack, _ = await PlayerPack.get_or_create(
+                player=self.trader1.player, pack_id=pack_id, defaults={"quantity": 0}
+            )
+            receiver_pack.quantity += qty
+            await receiver_pack.save(update_fields=["quantity"])
 
     async def confirm(self, trader: TradingUser) -> bool:
         """

@@ -11,7 +11,7 @@ from discord.ext import commands
 from discord.utils import MISSING
 from tortoise.expressions import Q
 
-from ballsdex.core.models import BallInstance, Player
+from ballsdex.core.models import BallInstance, Pack, Player, PlayerPack
 from ballsdex.core.models import Trade as TradeModel
 from ballsdex.core.utils.buttons import ConfirmChoiceView
 from ballsdex.core.utils.paginator import Pages
@@ -515,3 +515,319 @@ class Trade(commands.GroupCog):
 
         source = TradeViewMenu(interaction, [trade.trader1, trade.trader2], self)
         await source.start(content="Select a user to view their proposal.")
+
+    coins = app_commands.Group(name="coins", description="Trade coins")
+
+    @coins.command(name="add")
+    async def coins_add(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        amount: int,
+    ):
+        """
+        Add coins to your trade proposal.
+
+        Parameters
+        ----------
+        amount: int
+            The amount of coins to add
+        """
+        if amount < 1:
+            await interaction.response.send_message(
+                "Amount must be at least 1!", ephemeral=True
+            )
+            return
+
+        trade, trader = self.get_trade(interaction)
+        if not trade or not trader:
+            await interaction.response.send_message(
+                "You do not have an ongoing trade.", ephemeral=True
+            )
+            return
+        if trader.locked:
+            await interaction.response.send_message(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the trade instead.",
+                ephemeral=True,
+            )
+            return
+
+        await trader.player.refresh_from_db()
+        available_coins = trader.player.coins - trader.coins
+
+        if amount > available_coins:
+            await interaction.response.send_message(
+                f"You don't have enough coins! "
+                f"Available: **{available_coins:,}** coins (already offering {trader.coins:,})",
+                ephemeral=True,
+            )
+            return
+
+        trader.coins += amount
+        await interaction.response.send_message(
+            f"Added **{amount:,}** coins to your proposal. Total coins offered: **{trader.coins:,}**",
+            ephemeral=True,
+        )
+
+    @coins.command(name="remove")
+    async def coins_remove(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        amount: int,
+    ):
+        """
+        Remove coins from your trade proposal.
+
+        Parameters
+        ----------
+        amount: int
+            The amount of coins to remove
+        """
+        if amount < 1:
+            await interaction.response.send_message(
+                "Amount must be at least 1!", ephemeral=True
+            )
+            return
+
+        trade, trader = self.get_trade(interaction)
+        if not trade or not trader:
+            await interaction.response.send_message(
+                "You do not have an ongoing trade.", ephemeral=True
+            )
+            return
+        if trader.locked:
+            await interaction.response.send_message(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the trade instead.",
+                ephemeral=True,
+            )
+            return
+
+        if amount > trader.coins:
+            await interaction.response.send_message(
+                f"You only have **{trader.coins:,}** coins in your proposal!",
+                ephemeral=True,
+            )
+            return
+
+        trader.coins -= amount
+        await interaction.response.send_message(
+            f"Removed **{amount:,}** coins from your proposal. Total coins offered: **{trader.coins:,}**",
+            ephemeral=True,
+        )
+
+    pack = app_commands.Group(name="pack", description="Trade packs")
+
+    async def owned_pack_autocomplete(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        try:
+            player_packs = await PlayerPack.filter(
+                player__discord_id=interaction.user.id,
+                quantity__gt=0
+            ).prefetch_related("pack")
+
+            trade, trader = self.get_trade(interaction)
+            already_offered: dict[int, int] = {}
+            if trader:
+                already_offered = trader.packs.copy()
+
+            choices = []
+            for pp in player_packs:
+                offered = already_offered.get(pp.pack.pk, 0)
+                available = pp.quantity - offered
+                if available > 0 and current.lower() in pp.pack.name.lower():
+                    emoji = pp.pack.emoji + " " if pp.pack.emoji else ""
+                    choices.append(app_commands.Choice(
+                        name=f"{emoji}{pp.pack.name} ({available} available)",
+                        value=str(pp.pack.pk)
+                    ))
+            return choices[:25]
+        except Exception:
+            return []
+
+    async def trade_pack_autocomplete(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        try:
+            trade, trader = self.get_trade(interaction)
+            if not trader or not trader.packs:
+                return []
+
+            choices = []
+            for pack_id, qty in trader.packs.items():
+                pack_name = trader.pack_names.get(pack_id, f"Pack #{pack_id}")
+                pack_emoji = trader.pack_emojis.get(pack_id, "")
+                if current.lower() in pack_name.lower():
+                    emoji = pack_emoji + " " if pack_emoji else ""
+                    choices.append(app_commands.Choice(
+                        name=f"{emoji}{pack_name} ({qty} in proposal)",
+                        value=str(pack_id)
+                    ))
+            return choices[:25]
+        except Exception:
+            return []
+
+    @pack.command(name="add")
+    @app_commands.autocomplete(pack_choice=owned_pack_autocomplete)
+    async def pack_add(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        pack_choice: str,
+        amount: int = 1,
+    ):
+        """
+        Add packs to your trade proposal.
+
+        Parameters
+        ----------
+        pack_choice: str
+            The pack to add
+        amount: int
+            The number of packs to add (default: 1)
+        """
+        if amount < 1:
+            await interaction.response.send_message(
+                "Amount must be at least 1!", ephemeral=True
+            )
+            return
+
+        trade, trader = self.get_trade(interaction)
+        if not trade or not trader:
+            await interaction.response.send_message(
+                "You do not have an ongoing trade.", ephemeral=True
+            )
+            return
+        if trader.locked:
+            await interaction.response.send_message(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the trade instead.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            pack_id = int(pack_choice)
+            pack = await Pack.get(pk=pack_id)
+        except Exception:
+            await interaction.response.send_message(
+                "Invalid pack. Please use the autocomplete.", ephemeral=True
+            )
+            return
+
+        player_pack = await PlayerPack.filter(
+            player__discord_id=interaction.user.id,
+            pack_id=pack_id
+        ).first()
+
+        if not player_pack:
+            await interaction.response.send_message(
+                "You don't own any of this pack!", ephemeral=True
+            )
+            return
+
+        already_offered = trader.packs.get(pack_id, 0)
+        available = player_pack.quantity - already_offered
+
+        if amount > available:
+            await interaction.response.send_message(
+                f"You don't have enough of this pack! "
+                f"Available: **{available}** (already offering {already_offered})",
+                ephemeral=True,
+            )
+            return
+
+        if pack_id in trader.packs:
+            trader.packs[pack_id] += amount
+        else:
+            trader.packs[pack_id] = amount
+            trader.pack_names[pack_id] = pack.name
+            trader.pack_emojis[pack_id] = pack.emoji or ""
+
+        await interaction.response.send_message(
+            f"Added **{amount}x {pack.name}** to your proposal. "
+            f"Total offered: **{trader.packs[pack_id]}**",
+            ephemeral=True,
+        )
+
+    @pack.command(name="remove")
+    @app_commands.autocomplete(pack_choice=trade_pack_autocomplete)
+    async def pack_remove(
+        self,
+        interaction: discord.Interaction["BallsDexBot"],
+        pack_choice: str,
+        amount: int = 1,
+    ):
+        """
+        Remove packs from your trade proposal.
+
+        Parameters
+        ----------
+        pack_choice: str
+            The pack to remove
+        amount: int
+            The number of packs to remove (default: 1)
+        """
+        if amount < 1:
+            await interaction.response.send_message(
+                "Amount must be at least 1!", ephemeral=True
+            )
+            return
+
+        trade, trader = self.get_trade(interaction)
+        if not trade or not trader:
+            await interaction.response.send_message(
+                "You do not have an ongoing trade.", ephemeral=True
+            )
+            return
+        if trader.locked:
+            await interaction.response.send_message(
+                "You have locked your proposal, it cannot be edited! "
+                "You can click the cancel button to stop the trade instead.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            pack_id = int(pack_choice)
+        except Exception:
+            await interaction.response.send_message(
+                "Invalid pack. Please use the autocomplete.", ephemeral=True
+            )
+            return
+
+        if pack_id not in trader.packs:
+            await interaction.response.send_message(
+                "You don't have this pack in your proposal!", ephemeral=True
+            )
+            return
+
+        pack_name = trader.pack_names.get(pack_id, f"Pack #{pack_id}")
+
+        if amount > trader.packs[pack_id]:
+            await interaction.response.send_message(
+                f"You only have **{trader.packs[pack_id]}** of this pack in your proposal!",
+                ephemeral=True,
+            )
+            return
+
+        trader.packs[pack_id] -= amount
+        if trader.packs[pack_id] == 0:
+            del trader.packs[pack_id]
+            del trader.pack_names[pack_id]
+            if pack_id in trader.pack_emojis:
+                del trader.pack_emojis[pack_id]
+            await interaction.response.send_message(
+                f"Removed all **{pack_name}** from your proposal.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                f"Removed **{amount}x {pack_name}** from your proposal. "
+                f"Remaining: **{trader.packs[pack_id]}**",
+                ephemeral=True,
+            )

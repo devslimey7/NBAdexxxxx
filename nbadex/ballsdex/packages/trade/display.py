@@ -83,9 +83,11 @@ def _build_list_of_strings(
             text = f"~~{text}~~"
         proposal[i] += text
 
-    for pack, qty in trader.packs.items():
-        emoji = pack.emoji + " " if pack.emoji else "\N{PACKAGE} "
-        pack_text = f"{emoji}**{qty}x** {pack.name}"
+    for pack_id, qty in trader.packs.items():
+        pack_name = trader.pack_names.get(pack_id, f"Pack #{pack_id}")
+        pack_emoji = trader.pack_emojis.get(pack_id, "")
+        emoji = pack_emoji + " " if pack_emoji else "\N{PACKAGE} "
+        pack_text = f"{emoji}**{qty}x** {pack_name}"
         if trader.locked:
             text = f"- *{pack_text}*\n"
         else:
