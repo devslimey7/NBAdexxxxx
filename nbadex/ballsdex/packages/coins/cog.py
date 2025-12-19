@@ -411,15 +411,14 @@ class Packs(commands.GroupCog, group_name="pack"):
         
         for pack in packs:
             emoji = pack.emoji + " " if pack.emoji else ""
-            special_text = f"\nEvent: {pack.special.name}" if pack.special else "\nEvent: Any"
+            description = pack.description if pack.description else "No description"
             limit_text = f"\nDaily Limit: {pack.daily_limit}" if pack.daily_limit > 0 else ""
             
             embed.add_field(
                 name=f"{emoji}{pack.name}",
                 value=(
                     f"Price: **{pack.price:,}** coins\n"
-                    f"Rarity Range: {pack.min_rarity} - {pack.max_rarity}"
-                    f"{special_text}{limit_text}"
+                    f"{description}{limit_text}"
                 ),
                 inline=True
             )
