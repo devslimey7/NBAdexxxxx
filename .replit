@@ -60,4 +60,5 @@ localPort = 37363
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "gce"
+deploymentTarget = "vm"
+run = ["bash", "-c", "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex & cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application"]
