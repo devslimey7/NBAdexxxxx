@@ -17,6 +17,11 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - **Fixed admin pack quantity doubling**: Admin `/admin packs add` command no longer doubles quantities when adding packs
   - **Fixed daily limit tracking**: Daily limits are now tracked per pack opened, not per card received
 
+- **NEW USER COMMANDS**:
+  - `/coins balance` - Now only shows your own balance (removed ability to view others)
+  - `/coins give` - Give coins to another user
+  - `/pack give` - Give packs to another user (with autocomplete)
+
 - **PACKS & COINS ECONOMY SYSTEM FULLY OPERATIONAL**: Complete economy system with coins and pack features
   - **Player coins**: `coins` field on Player model (INTEGER, default 0)
   - **Quicksell values**: `quicksell_value` field on Ball model for selling NBAs
