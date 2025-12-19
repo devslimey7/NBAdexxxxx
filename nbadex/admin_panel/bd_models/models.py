@@ -86,6 +86,7 @@ class Player(models.Model):
     trade_cooldown_policy = models.SmallIntegerField(
         choices=TradeCooldownPolicy.choices, help_text="To bypass or not the trade cooldown"
     )
+    coins = models.IntegerField(help_text="Player coins balance", default=0)
     extra_data = models.JSONField(blank=True, default=dict)
 
     def is_blacklisted(self) -> bool:
@@ -230,6 +231,9 @@ class Ball(models.Model):
     regime_id: int
     created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, editable=False)
     translations = models.TextField(blank=True, null=True)
+    quicksell_value = models.IntegerField(
+        help_text="Coins received when quickselling this ball", default=100
+    )
 
     def __str__(self) -> str:
         return self.country
@@ -422,3 +426,64 @@ class Block(models.Model):
     class Meta:
         managed = True
         db_table = "block"
+
+
+class Pack(models.Model):
+    name = models.CharField(max_length=64, unique=True, help_text="Pack name")
+    description = models.TextField(blank=True, null=True, help_text="Pack description")
+    emoji = models.CharField(max_length=64, blank=True, null=True, help_text="Emoji for this pack")
+    price = models.IntegerField(help_text="Price in coins to buy this pack")
+    cards_count = models.IntegerField(default=1, help_text="Number of cards in this pack")
+    min_rarity = models.FloatField(help_text="Minimum rarity of balls in this pack", default=0.0)
+    max_rarity = models.FloatField(help_text="Maximum rarity of balls in this pack", default=100.0)
+    special = models.ForeignKey(
+        Special, on_delete=models.SET_NULL, blank=True, null=True,
+        help_text="Optional: only give balls from this special event"
+    )
+    special_id: int | None
+    special_only = models.BooleanField(default=False, help_text="Only include special cards in this pack")
+    daily_limit = models.IntegerField(
+        help_text="Maximum packs a player can open per day (0 = unlimited)", default=0
+    )
+    enabled = models.BooleanField(default=True, help_text="Whether this pack is available for purchase")
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self) -> str:
+        emoji = self.emoji + " " if self.emoji else ""
+        return f"{emoji}{self.name}"
+
+    class Meta:
+        managed = True
+        db_table = "pack"
+
+
+class PlayerPack(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="playerpacks")
+    player_id: int
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="playerpacks")
+    pack_id: int
+    quantity = models.IntegerField(default=0, help_text="Number of packs owned")
+
+    def __str__(self) -> str:
+        return f"{self.player} - {self.pack} x{self.quantity}"
+
+    class Meta:
+        managed = True
+        db_table = "playerpack"
+        unique_together = (("player", "pack"),)
+
+
+class PackOpenHistory(models.Model):
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="pack_opens")
+    player_id: int
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="pack_opens")
+    pack_id: int
+    opened_at = models.DateTimeField(auto_now_add=True, editable=False)
+    cards_received = models.IntegerField(default=1, help_text="Number of cards received")
+
+    def __str__(self) -> str:
+        return f"{self.player} opened {self.pack}"
+
+    class Meta:
+        managed = True
+        db_table = "packopenhistory"

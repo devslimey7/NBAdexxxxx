@@ -10,7 +10,41 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
 
-# Recent Changes (Session: Nov 27, 2025)
+# Recent Changes (Session: Dec 19, 2025)
+
+- **PACKS & COINS ECONOMY SYSTEM FULLY OPERATIONAL**: Complete economy system with coins and pack features
+  - **Player coins**: `coins` field on Player model (INTEGER, default 0)
+  - **Quicksell values**: `quicksell_value` field on Ball model for selling NBAs
+  - **Pack system**: Pack model with name, description, price, cards_count, min/max rarity, special filters, daily limits
+  - **Pack inventory**: PlayerPack model for tracking owned packs
+  - **Pack history**: PackOpenHistory model for tracking pack opens
+
+  **Discord Commands (9 commands synced):**
+  - `/coins balance` - Check your or another user's coin balance
+  - `/coins sell` - Quicksell an NBA for coins (1.5x bonus for special cards)
+  - `/coins bulk_sell` - Sell multiple NBAs at once with filters
+  - `/pack list` - View available packs for purchase
+  - `/pack buy` - Purchase a pack with coins
+  - `/pack open` - Open a pack from inventory to receive NBAs
+  - `/pack inventory` - View your owned packs
+
+  **Admin Commands:**
+  - `/admin coins add/remove/set/check` - Manage player coin balances
+  - `/admin packs add/remove/check` - Manage player pack inventories
+
+  **Django Admin Panel:**
+  - PackAdmin: Manage packs with rarity ranges, special event filters, daily limits
+  - PlayerPackAdmin: View/edit player pack inventories
+  - PackOpenHistoryAdmin: Read-only history of pack opens
+  - BallAdmin updated with Economy section for quicksell_value
+
+  **Database Tables (Neon PostgreSQL):**
+  - `pack`: Stores pack definitions
+  - `playerpack`: Player pack inventories
+  - `packopenhistory`: Pack opening history
+  - Columns added: `player.coins`, `ball.quicksell_value`
+
+# Previous Session (Nov 27, 2025)
 
 - **BETTING SYSTEM FULLY OPERATIONAL**: Complete betting system with 7 commands, all database issues resolved
   - Class named `Bet` for correct `/bet` command prefix (not `/betting`)
@@ -68,13 +102,16 @@ Database Management: Clean up unused fields and systems entirely rather than usi
 **Rationale**: The bot uses Tortoise ORM for async database operations which are essential for Discord bots. The admin panel uses Django's ORM which provides a mature admin interface out-of-the-box. Both ORMs connect to the same PostgreSQL database.
 
 **Key models**:
-- `Ball`: Represents NBA collectibles (teams, players)
+- `Ball`: Represents NBA collectibles (teams, players) - includes `quicksell_value` for economy
 - `BallInstance`: Individual cards owned by players
-- `Player`: Discord users who collect cards
+- `Player`: Discord users who collect cards - includes `coins` balance
 - `Trade`: Trading system between players
 - `Bet`: Betting records (player1, player2, winner, started_at, ended_at, cancelled)
 - `BetStake`: Individual NBAs staked in a bet (references Bet, Player, BallInstance)
 - `BetHistory`: Permanent history of completed/cancelled bets
+- `Pack`: Pack definitions with price, rarity ranges, special filters, daily limits
+- `PlayerPack`: Player pack inventories (quantity owned per pack type)
+- `PackOpenHistory`: History of pack openings with cards received
 - `Special`: Special event cards (e.g., shiny variants)
 - `GuildConfig`: Server-specific settings
 - `BlacklistedID/BlacklistedGuild`: Moderation system
@@ -88,10 +125,11 @@ Database Management: Clean up unused fields and systems entirely rather than usi
 **Key cogs**:
 - `CountryBallsSpawner`: Handles spawning collectibles in channels based on message activity
 - `Balls`: Player inventory management, info commands, donations
-- `Admin`: Administrative commands for bot owners/staff
+- `Admin`: Administrative commands for bot owners/staff (includes coins and packs admin subgroups)
 - `Config`: Server configuration and setup
 - `Trade`: Trading system between players
 - `Bet`: Betting system with 7 commands - `/bet begin|add|remove|view|cancel|bulk add|history`
+- `Coins`: Economy system with `/coins balance|sell|bulk_sell` and `/pack list|buy|open|inventory`
 
 ### Spawn System
 

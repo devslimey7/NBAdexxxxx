@@ -123,6 +123,13 @@ class BallAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Economy",
+            {
+                "description": "Coins and pack economy settings",
+                "fields": ["quicksell_value"],
+            },
+        ),
+        (
             "Advanced",
             {
                 "description": "Advanced settings",
