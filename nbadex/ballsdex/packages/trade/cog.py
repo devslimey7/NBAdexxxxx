@@ -518,6 +518,21 @@ class Trade(commands.GroupCog):
 
     coins = app_commands.Group(name="coins", description="Trade coins")
 
+    async def safe_send(
+        self,
+        interaction: discord.Interaction,
+        content: str,
+        ephemeral: bool = True,
+    ):
+        """Send a message safely, using followup if already responded."""
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(content, ephemeral=ephemeral)
+            else:
+                await interaction.response.send_message(content, ephemeral=ephemeral)
+        except Exception:
+            pass
+
     @coins.command(name="add")
     async def coins_add(
         self,
@@ -533,22 +548,18 @@ class Trade(commands.GroupCog):
             The amount of coins to add
         """
         if amount < 1:
-            await interaction.response.send_message(
-                "Amount must be at least 1!", ephemeral=True
-            )
+            await self.safe_send(interaction, "Amount must be at least 1!")
             return
 
         trade, trader = self.get_trade(interaction)
         if not trade or not trader:
-            await interaction.response.send_message(
-                "You do not have an ongoing trade.", ephemeral=True
-            )
+            await self.safe_send(interaction, "You do not have an ongoing trade.")
             return
         if trader.locked:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 "You have locked your proposal, it cannot be edited! "
                 "You can click the cancel button to stop the trade instead.",
-                ephemeral=True,
             )
             return
 
@@ -556,17 +567,17 @@ class Trade(commands.GroupCog):
         available_coins = trader.player.coins - trader.coins
 
         if amount > available_coins:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 f"You don't have enough coins! "
                 f"Available: **{available_coins:,}** coins (already offering {trader.coins:,})",
-                ephemeral=True,
             )
             return
 
         trader.coins += amount
-        await interaction.response.send_message(
+        await self.safe_send(
+            interaction,
             f"Added **{amount:,}** coins to your proposal. Total coins offered: **{trader.coins:,}**",
-            ephemeral=True,
         )
 
     @coins.command(name="remove")
@@ -584,36 +595,32 @@ class Trade(commands.GroupCog):
             The amount of coins to remove
         """
         if amount < 1:
-            await interaction.response.send_message(
-                "Amount must be at least 1!", ephemeral=True
-            )
+            await self.safe_send(interaction, "Amount must be at least 1!")
             return
 
         trade, trader = self.get_trade(interaction)
         if not trade or not trader:
-            await interaction.response.send_message(
-                "You do not have an ongoing trade.", ephemeral=True
-            )
+            await self.safe_send(interaction, "You do not have an ongoing trade.")
             return
         if trader.locked:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 "You have locked your proposal, it cannot be edited! "
                 "You can click the cancel button to stop the trade instead.",
-                ephemeral=True,
             )
             return
 
         if amount > trader.coins:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 f"You only have **{trader.coins:,}** coins in your proposal!",
-                ephemeral=True,
             )
             return
 
         trader.coins -= amount
-        await interaction.response.send_message(
+        await self.safe_send(
+            interaction,
             f"Removed **{amount:,}** coins from your proposal. Total coins offered: **{trader.coins:,}**",
-            ephemeral=True,
         )
 
     pack = app_commands.Group(name="pack", description="Trade packs")
@@ -691,22 +698,18 @@ class Trade(commands.GroupCog):
             The number of packs to add (default: 1)
         """
         if amount < 1:
-            await interaction.response.send_message(
-                "Amount must be at least 1!", ephemeral=True
-            )
+            await self.safe_send(interaction, "Amount must be at least 1!")
             return
 
         trade, trader = self.get_trade(interaction)
         if not trade or not trader:
-            await interaction.response.send_message(
-                "You do not have an ongoing trade.", ephemeral=True
-            )
+            await self.safe_send(interaction, "You do not have an ongoing trade.")
             return
         if trader.locked:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 "You have locked your proposal, it cannot be edited! "
                 "You can click the cancel button to stop the trade instead.",
-                ephemeral=True,
             )
             return
 
@@ -714,9 +717,7 @@ class Trade(commands.GroupCog):
             pack_id = int(pack_choice)
             pack = await Pack.get(pk=pack_id)
         except Exception:
-            await interaction.response.send_message(
-                "Invalid pack. Please use the autocomplete.", ephemeral=True
-            )
+            await self.safe_send(interaction, "Invalid pack. Please use the autocomplete.")
             return
 
         player_pack = await PlayerPack.filter(
@@ -725,19 +726,17 @@ class Trade(commands.GroupCog):
         ).first()
 
         if not player_pack:
-            await interaction.response.send_message(
-                "You don't own any of this pack!", ephemeral=True
-            )
+            await self.safe_send(interaction, "You don't own any of this pack!")
             return
 
         already_offered = trader.packs.get(pack_id, 0)
         available = player_pack.quantity - already_offered
 
         if amount > available:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 f"You don't have enough of this pack! "
                 f"Available: **{available}** (already offering {already_offered})",
-                ephemeral=True,
             )
             return
 
@@ -748,10 +747,10 @@ class Trade(commands.GroupCog):
             trader.pack_names[pack_id] = pack.name
             trader.pack_emojis[pack_id] = pack.emoji or ""
 
-        await interaction.response.send_message(
+        await self.safe_send(
+            interaction,
             f"Added **{amount}x {pack.name}** to your proposal. "
             f"Total offered: **{trader.packs[pack_id]}**",
-            ephemeral=True,
         )
 
     @pack.command(name="remove")
@@ -773,45 +772,37 @@ class Trade(commands.GroupCog):
             The number of packs to remove (default: 1)
         """
         if amount < 1:
-            await interaction.response.send_message(
-                "Amount must be at least 1!", ephemeral=True
-            )
+            await self.safe_send(interaction, "Amount must be at least 1!")
             return
 
         trade, trader = self.get_trade(interaction)
         if not trade or not trader:
-            await interaction.response.send_message(
-                "You do not have an ongoing trade.", ephemeral=True
-            )
+            await self.safe_send(interaction, "You do not have an ongoing trade.")
             return
         if trader.locked:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 "You have locked your proposal, it cannot be edited! "
                 "You can click the cancel button to stop the trade instead.",
-                ephemeral=True,
             )
             return
 
         try:
             pack_id = int(pack_choice)
         except Exception:
-            await interaction.response.send_message(
-                "Invalid pack. Please use the autocomplete.", ephemeral=True
-            )
+            await self.safe_send(interaction, "Invalid pack. Please use the autocomplete.")
             return
 
         if pack_id not in trader.packs:
-            await interaction.response.send_message(
-                "You don't have this pack in your proposal!", ephemeral=True
-            )
+            await self.safe_send(interaction, "You don't have this pack in your proposal!")
             return
 
         pack_name = trader.pack_names.get(pack_id, f"Pack #{pack_id}")
 
         if amount > trader.packs[pack_id]:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 f"You only have **{trader.packs[pack_id]}** of this pack in your proposal!",
-                ephemeral=True,
             )
             return
 
@@ -821,13 +812,10 @@ class Trade(commands.GroupCog):
             del trader.pack_names[pack_id]
             if pack_id in trader.pack_emojis:
                 del trader.pack_emojis[pack_id]
-            await interaction.response.send_message(
-                f"Removed all **{pack_name}** from your proposal.",
-                ephemeral=True,
-            )
+            await self.safe_send(interaction, f"Removed all **{pack_name}** from your proposal.")
         else:
-            await interaction.response.send_message(
+            await self.safe_send(
+                interaction,
                 f"Removed **{amount}x {pack_name}** from your proposal. "
                 f"Remaining: **{trader.packs[pack_id]}**",
-                ephemeral=True,
             )
