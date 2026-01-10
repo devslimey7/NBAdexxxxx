@@ -57,4 +57,4 @@ externalPort = 80
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex & cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application"]
+run = ["bash", "-c", "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content & cd nbadex/admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application"]
