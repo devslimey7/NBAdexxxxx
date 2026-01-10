@@ -96,11 +96,12 @@ class BulkSellSelector(Pages):
         self.interaction = interaction
         source = BulkSellSource(balls)
         super().__init__(source, interaction=interaction)
+        self.source = source
         self.add_item(self.select_ball_menu)
         self.add_item(self.confirm_button)
         self.add_item(self.select_all_button)
         self.add_item(self.clear_button)
-        self.balls_selected: Set[BallInstance] = set()
+        self.balls_selected: Set[int] = set()
         self.confirmed = False
 
     async def set_options(self, balls: AsyncIterator[BallInstance]):
@@ -119,7 +120,7 @@ class BulkSellSelector(Pages):
                     description=f"ATK: {ball.attack_bonus:+d}% • HP: {ball.health_bonus:+d}% • {value:,} coins",
                     emoji=emoji,
                     value=f"{ball.pk}",
-                    default=ball in self.balls_selected,
+                    default=ball.pk in self.balls_selected,
                 )
             )
         if options:
@@ -139,20 +140,23 @@ class BulkSellSelector(Pages):
     async def select_ball_menu(
         self, interaction: discord.Interaction["BallsDexBot"], item: discord.ui.Select
     ):
+        await interaction.response.defer()
         for value in item.values:
             if value == "none":
                 continue
-            ball_instance = await BallInstance.get(id=int(value)).prefetch_related(
-                "ball", "player", "special"
-            )
-            self.balls_selected.add(ball_instance)
-        await interaction.response.defer()
+            ball_id = int(value)
+            if ball_id in self.source.cache:
+                self.balls_selected.add(ball_id)
+            else:
+                ball_instance = await BallInstance.get(id=ball_id).prefetch_related("ball", "special")
+                self.source.cache[ball_id] = ball_instance
+                self.balls_selected.add(ball_id)
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary)
     async def confirm_button(
         self, interaction: discord.Interaction["BallsDexBot"], button: Button
     ):
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        await interaction.response.defer()
         if len(self.balls_selected) == 0:
             await interaction.followup.send(
                 f"You have not selected any {settings.plural_collectible_name} to sell.",
@@ -167,14 +171,11 @@ class BulkSellSelector(Pages):
         self, interaction: discord.Interaction["BallsDexBot"], button: Button
     ):
         await interaction.response.defer(thinking=True, ephemeral=True)
-        for ball in self.select_ball_menu.options:
-            if ball.value == "none":
+        for opt in self.select_ball_menu.options:
+            if opt.value == "none":
                 continue
-            ball_instance = await BallInstance.get(id=int(ball.value)).prefetch_related(
-                "ball", "player", "special"
-            )
-            if ball_instance not in self.balls_selected:
-                self.balls_selected.add(ball_instance)
+            ball_id = int(opt.value)
+            self.balls_selected.add(ball_id)
         await interaction.followup.send(
             f"All {settings.plural_collectible_name} on this page have been selected.\n"
             "Note that the menu may not reflect this change until you change page.",
@@ -188,11 +189,9 @@ class BulkSellSelector(Pages):
         await interaction.response.defer(thinking=True, ephemeral=True)
         self.balls_selected.clear()
         await interaction.followup.send(
-            f"You have cleared all currently selected {settings.plural_collectible_name}."
-            f"This does not affect {settings.plural_collectible_name} within your trade.\n"
-            f"There may be an instance where it shows {settings.plural_collectible_name} on the"
-            " current page as selected, this is not the case - "
-            "changing page will show the correct state.",
+            f"You have cleared all currently selected {settings.plural_collectible_name}.\n"
+            "There may be an instance where it shows selected items on the current page, "
+            "this is not the case - changing page will show the correct state.",
             ephemeral=True,
         )
 
@@ -530,65 +529,57 @@ class Coins(commands.GroupCog, group_name="coins"):
         if not view.confirmed or not view.balls_selected:
             return
         
-        total_value = 0
-        for inst in view.balls_selected:
-            value = inst.countryball.quicksell_value
-            if inst.specialcard:
-                value = int(value * 1.5)
-            total_value += value
-        
-        confirm_embed = discord.Embed(
-            title="Confirm Bulk Sell",
-            description=(
-                f"Are you sure you want to sell **{len(view.balls_selected)}** "
-                f"{settings.plural_collectible_name} for **{total_value:,}** coins?\n\n"
-                f"This action cannot be undone!"
-            ),
-            color=discord.Color.orange()
-        )
-        
-        confirm_view = ConfirmView(interaction.user)
-        await interaction.followup.send(embed=confirm_embed, view=confirm_view, ephemeral=True)
-        
-        await confirm_view.wait()
-        
-        if confirm_view.value is None or not confirm_view.value:
-            confirm_embed.description = "Bulk sell cancelled."
-            confirm_embed.color = discord.Color.red()
-            await interaction.edit_original_response(embed=confirm_embed, view=None)
-            return
-        
         _active_operations.add(interaction.user.id)
         try:
             sold_count = 0
             actual_value = 0
+            skipped = 0
             
             async with in_transaction():
                 await player.refresh_from_db()
                 
-                for inst in view.balls_selected:
-                    await inst.refresh_from_db()
-                    if inst.player_id == player.pk and not inst.deleted and not inst.favorite:
-                        value = inst.countryball.quicksell_value
-                        if inst.specialcard:
-                            value = int(value * 1.5)
-                        actual_value += value
-                        inst.deleted = True
-                        await inst.save(update_fields=["deleted"])
-                        sold_count += 1
+                valid_balls = await BallInstance.filter(
+                    id__in=list(view.balls_selected),
+                    player=player,
+                    deleted=False,
+                    favorite=False,
+                    locked__isnull=True
+                ).prefetch_related("ball", "special")
                 
+                for inst in valid_balls:
+                    await inst.lock_for_trade()
+                
+                for inst in valid_balls:
+                    value = inst.countryball.quicksell_value
+                    if inst.specialcard:
+                        value = int(value * 1.5)
+                    actual_value += value
+                    inst.deleted = True
+                    await inst.save(update_fields=["deleted"])
+                    await inst.unlock()
+                    sold_count += 1
+                
+                skipped = len(view.balls_selected) - sold_count
                 player.coins += actual_value
                 await player.save(update_fields=["coins"])
             
-            embed = discord.Embed(
-                title="Bulk Quicksell Complete!",
-                description=(
-                    f"You sold **{sold_count}** {settings.plural_collectible_name} for **{actual_value:,}** coins!\n"
-                    f"New balance: **{player.coins:,}** coins"
-                ),
-                color=discord.Color.green()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            if sold_count == 0:
+                embed = discord.Embed(
+                    title="Bulk Sell Failed",
+                    description="None of the selected NBAs could be sold. They may have been traded or locked.",
+                    color=discord.Color.red()
+                )
+            else:
+                skip_text = f"\n({skipped} skipped - traded/locked)" if skipped > 0 else ""
+                embed = discord.Embed(
+                    title="Bulk Quicksell Complete!",
+                    description=(
+                        f"You sold **{sold_count}** {settings.plural_collectible_name} for **{actual_value:,}** coins!{skip_text}\n"
+                        f"New balance: **{player.coins:,}** coins"
+                    ),
+                    color=discord.Color.green()
+                )
+            await interaction.edit_original_response(content=None, embed=embed, view=None)
         finally:
             _active_operations.discard(interaction.user.id)
 
