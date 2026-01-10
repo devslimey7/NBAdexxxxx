@@ -32,12 +32,12 @@ args = "Admin Panel"
 name = "Discord Bot"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"
 
 [[workflows.workflow]]
 name = "Admin Panel"
