@@ -10,7 +10,34 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
 - Admin commands for moderation and bot management
 - OAuth2 authentication for the admin panel
 
-# Recent Changes (Session: Dec 19, 2025)
+# Recent Changes (Session: Jan 10, 2026)
+
+- **CRITICAL SECURITY FIX: Pack Opening Race Condition**
+  - Fixed exploit where users could open multiple packs by clicking fast even with only one pack
+  - Pack quantity is now decremented INSIDE the atomic transaction BEFORE any card generation
+  - Added global `_active_operations` lock to prevent concurrent operations per user
+  - All pack/coin operations now check and block if user already has operation in progress
+
+- **ANTI-ABUSE IMPROVEMENTS FOR ECONOMY**:
+  - Added in-memory operation locks (`_active_operations` set) to prevent double-spending
+  - All coins/packs commands now check for active operations before processing
+  - Atomic transactions wrap entire operations from validation to completion
+  - Users see "You have another operation in progress!" if they try to exploit
+
+- **BULK SELL COMMAND IMPROVED** (`/coins bulk_sell`):
+  - Now has interactive selection UI like `/trade bulk add`
+  - Paginated dropdown selector to choose which NBAs to sell
+  - "Select All" button for convenience
+  - Shows live total of selected NBAs and coin value
+  - Confirm/Cancel buttons for final action
+  - Filters: by NBA type, special event, with sorting options
+
+- **ALL COMMANDS FASTER AND BUG-FREE**:
+  - ConfirmView buttons now defer responses to prevent interaction failures
+  - All autocomplete functions have try/except to prevent timeout errors
+  - Proper error handling throughout all economy commands
+
+# Previous Session (Dec 19, 2025)
 
 - **TRADE SYSTEM EXPANDED**: Full support for trading coins and packs
   - `/trade coins add <amount>` - Add coins to your trade proposal
