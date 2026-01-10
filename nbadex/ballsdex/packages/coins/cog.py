@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import TYPE_CHECKING, Optional, List, Set, AsyncIterator
+from typing import TYPE_CHECKING, Optional, List, Set, AsyncIterator, cast
 
 import discord
 from discord import app_commands
@@ -21,6 +21,7 @@ from ballsdex.core.models import (
 )
 from ballsdex.core.utils import menus
 from ballsdex.core.utils.paginator import Pages
+from ballsdex.core.utils.sorting import FilteringChoices, SortingChoices, filter_balls, sort_balls
 from ballsdex.core.utils.transformers import BallInstanceTransform, BallEnabledTransform, SpecialEnabledTransform
 from ballsdex.settings import settings
 
@@ -101,11 +102,18 @@ class BulkSellSelector(Pages):
                     default=ball in self.balls_selected,
                 )
             )
-        self.select_ball_menu.options = options if options else [
-            discord.SelectOption(label="No NBAs available", value="none")
-        ]
-        self.select_ball_menu.max_values = max(1, len(options))
-        self.select_ball_menu.min_values = 0 if options else 1
+        if options:
+            self.select_ball_menu.options = options
+            self.select_ball_menu.max_values = len(options)
+            self.select_ball_menu.min_values = 0
+            self.select_ball_menu.disabled = False
+        else:
+            self.select_ball_menu.options = [
+                discord.SelectOption(label="No NBAs available", value="none")
+            ]
+            self.select_ball_menu.max_values = 1
+            self.select_ball_menu.min_values = 1
+            self.select_ball_menu.disabled = True
 
     @discord.ui.select(min_values=0, max_values=25)
     async def select_ball_menu(
@@ -220,15 +228,6 @@ class OwnedPackTransform(app_commands.Transformer):
             return choices[:25]
         except Exception:
             return []
-
-
-class SortingChoices(discord.Enum):
-    alphabetical = "ball__country"
-    rarity_desc = "-ball__rarity"
-    rarity_asc = "ball__rarity"
-    health = "-health_bonus"
-    attack = "-attack_bonus"
-    quicksell = "-ball__quicksell_value"
 
 
 class Coins(commands.GroupCog, group_name="coins"):
@@ -445,28 +444,31 @@ class Coins(commands.GroupCog, group_name="coins"):
     @app_commands.command()
     async def bulk_sell(
         self,
-        interaction: discord.Interaction,
-        countryball: Optional[BallEnabledTransform] = None,
-        special: Optional[SpecialEnabledTransform] = None,
-        sort: Optional[SortingChoices] = None,
+        interaction: discord.Interaction["BallsDexBot"],
+        countryball: BallEnabledTransform | None = None,
+        sort: SortingChoices | None = None,
+        special: SpecialEnabledTransform | None = None,
+        filter: FilteringChoices | None = None,
     ):
         """
-        Bulk sell multiple NBAs for coins with selection.
+        Bulk sell nbas for coins, with paramaters to aid with searching.
 
         Parameters
         ----------
         countryball: Ball
-            Filter by specific NBA type (optional)
-        special: Special
-            Filter by special event (optional)
+            The nba you would like to filter the results to
         sort: SortingChoices
-            Sort order for selection (optional)
+            Choose how nbas are sorted. Can be used to show duplicates.
+        special: Special
+            Filter the results to a special event
+        filter: FilteringChoices
+            Filter the results to a specific filter
         """
         if interaction.user.id in _active_operations:
             await interaction.response.send_message("You have another operation in progress!", ephemeral=True)
             return
         
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         
         player, _ = await Player.get_or_create(discord_id=interaction.user.id)
         
@@ -476,31 +478,29 @@ class Coins(commands.GroupCog, group_name="coins"):
             query = query.filter(ball=countryball)
         if special:
             query = query.filter(special=special)
+        if sort:
+            query = sort_balls(sort, query)
+        if filter:
+            query = filter_balls(filter, query, interaction.guild_id)
         
-        order = sort.value if sort else "-ball__quicksell_value"
-        instances = await query.order_by(order).prefetch_related("ball", "special")
+        balls = cast(list[int], await query.values_list("id", flat=True))
         
-        if not instances:
+        if not balls:
             await interaction.followup.send(
-                f"No sellable {settings.plural_collectible_name} found matching your filters!",
-                ephemeral=True
+                f"No {settings.plural_collectible_name} found.", ephemeral=True
             )
             return
         
-        ball_ids = [inst.pk for inst in instances]
-        view = BulkSellSelector(interaction, ball_ids)
-        
-        content = (
-            f"Select the {settings.plural_collectible_name} you want to add to your sell proposal, "
-            "note that the display will wipe on pagination however the selected "
-            f"{settings.plural_collectible_name} will remain."
+        view = BulkSellSelector(interaction, balls)
+        await view.start(
+            content=f"Select the {settings.plural_collectible_name} you want to sell, "
+            "note that the display will wipe on pagination however "
+            f"the selected {settings.plural_collectible_name} will remain."
         )
         
-        await view.start(content=content, ephemeral=True)
         await view.wait()
         
         if not view.confirmed or not view.balls_selected:
-            await interaction.followup.send("Bulk sell cancelled.", ephemeral=True)
             return
         
         _active_operations.add(interaction.user.id)
