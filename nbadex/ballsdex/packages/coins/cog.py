@@ -940,7 +940,7 @@ class Packs(commands.GroupCog, group_name="pack"):
         
         _active_operations.add(interaction.user.id)
         try:
-            await pack.fetch_related("pack", "player")
+            await pack.fetch_related("pack", "pack__special", "player")
             the_pack = pack.pack
             player = pack.player
             
@@ -979,13 +979,35 @@ class Packs(commands.GroupCog, group_name="pack"):
                 pack.quantity -= amount
                 await pack.save(update_fields=["quantity"])
                 
-                query = Ball.filter(
-                    enabled=True,
-                    rarity__gte=the_pack.min_rarity,
-                    rarity__lte=the_pack.max_rarity
-                )
+                special_to_use = None
+                if the_pack.special_id:
+                    special_to_use = the_pack.special
                 
-                available_balls = await query.all()
+                if the_pack.special_only and special_to_use:
+                    special_balls = await BallInstance.filter(
+                        special=special_to_use,
+                        deleted=False
+                    ).prefetch_related("ball").distinct().values_list("ball_id", flat=True)
+                    
+                    available_balls = await Ball.filter(
+                        enabled=True,
+                        id__in=list(special_balls),
+                        rarity__gte=the_pack.min_rarity,
+                        rarity__lte=the_pack.max_rarity
+                    ).all()
+                    
+                    if not available_balls:
+                        available_balls = await Ball.filter(
+                            enabled=True,
+                            rarity__gte=the_pack.min_rarity,
+                            rarity__lte=the_pack.max_rarity
+                        ).all()
+                else:
+                    available_balls = await Ball.filter(
+                        enabled=True,
+                        rarity__gte=the_pack.min_rarity,
+                        rarity__lte=the_pack.max_rarity
+                    ).all()
                 
                 if not available_balls:
                     pack.quantity += amount
@@ -998,9 +1020,6 @@ class Packs(commands.GroupCog, group_name="pack"):
                 total_rarity = sum(b.rarity for b in available_balls)
                 
                 results = []
-                special_to_use = None
-                if the_pack.special:
-                    special_to_use = the_pack.special
                 
                 for _ in range(amount):
                     pack_cards = []
