@@ -705,47 +705,47 @@ class Packs(commands.GroupCog, group_name="pack"):
             await interaction.response.send_message("You have another operation in progress!", ephemeral=True)
             return
         
-        total_cost = pack.price * amount
-        
-        player, _ = await Player.get_or_create(discord_id=interaction.user.id)
-        
-        if player.coins < total_cost:
-            await interaction.response.send_message(
-                f"You don't have enough coins! You need **{total_cost:,}** coins but only have **{player.coins:,}** coins.",
-                ephemeral=True
-            )
-            return
-        
-        emoji = pack.emoji + " " if pack.emoji else ""
-        
-        embed = discord.Embed(
-            title="Confirm Purchase",
-            description=(
-                f"Are you sure you want to buy **{amount}x {emoji}{pack.name}** "
-                f"for **{total_cost:,}** coins?"
-            ),
-            color=discord.Color.blue()
-        )
-        
-        view = ConfirmView(interaction.user)
-        await interaction.response.send_message(embed=embed, view=view)
-        
-        await view.wait()
-        
-        if view.value is None:
-            embed.description = "Purchase timed out."
-            embed.color = discord.Color.greyple()
-            await interaction.edit_original_response(embed=embed, view=None)
-            return
-        
-        if not view.value:
-            embed.description = "Purchase cancelled."
-            embed.color = discord.Color.red()
-            await interaction.edit_original_response(embed=embed, view=None)
-            return
-        
         _active_operations.add(interaction.user.id)
         try:
+            total_cost = pack.price * amount
+            
+            player, _ = await Player.get_or_create(discord_id=interaction.user.id)
+            
+            if player.coins < total_cost:
+                await interaction.response.send_message(
+                    f"You don't have enough coins! You need **{total_cost:,}** coins but only have **{player.coins:,}** coins.",
+                    ephemeral=True
+                )
+                return
+            
+            emoji = pack.emoji + " " if pack.emoji else ""
+            
+            embed = discord.Embed(
+                title="Confirm Purchase",
+                description=(
+                    f"Are you sure you want to buy **{amount}x {emoji}{pack.name}** "
+                    f"for **{total_cost:,}** coins?"
+                ),
+                color=discord.Color.blue()
+            )
+            
+            view = ConfirmView(interaction.user)
+            await interaction.response.send_message(embed=embed, view=view)
+            
+            await view.wait()
+            
+            if view.value is None:
+                embed.description = "Purchase timed out."
+                embed.color = discord.Color.greyple()
+                await interaction.edit_original_response(embed=embed, view=None)
+                return
+            
+            if not view.value:
+                embed.description = "Purchase cancelled."
+                embed.color = discord.Color.red()
+                await interaction.edit_original_response(embed=embed, view=None)
+                return
+            
             async with in_transaction():
                 await player.refresh_from_db()
                 
