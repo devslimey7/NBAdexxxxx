@@ -307,7 +307,6 @@ class Coins(commands.GroupCog, group_name="coins"):
             description="\n".join(lines),
             color=discord.Color.gold()
         )
-        embed.set_footer(text="💵 Use /coins sell or /pack open to earn coins!")
         await interaction.followup.send(embed=embed)
 
     @app_commands.command()
