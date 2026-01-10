@@ -139,6 +139,7 @@ class BulkSellSelector(Pages):
     async def select_ball_menu(
         self, interaction: discord.Interaction["BallsDexBot"], item: discord.ui.Select
     ):
+        await interaction.response.defer()
         for value in item.values:
             if value == "none":
                 continue
@@ -146,7 +147,6 @@ class BulkSellSelector(Pages):
                 "ball", "player", "special"
             )
             self.balls_selected.add(ball_instance)
-        await interaction.response.defer()
 
     @discord.ui.button(label="Select Page", style=discord.ButtonStyle.secondary)
     async def select_all_button(
@@ -523,10 +523,38 @@ class Coins(commands.GroupCog, group_name="coins"):
         if not view.confirmed or not view.balls_selected:
             return
         
+        total_value = 0
+        for inst in view.balls_selected:
+            value = inst.countryball.quicksell_value
+            if inst.specialcard:
+                value = int(value * 1.5)
+            total_value += value
+        
+        confirm_embed = discord.Embed(
+            title="Confirm Bulk Sell",
+            description=(
+                f"Are you sure you want to sell **{len(view.balls_selected)}** "
+                f"{settings.plural_collectible_name} for **{total_value:,}** coins?\n\n"
+                f"This action cannot be undone!"
+            ),
+            color=discord.Color.orange()
+        )
+        
+        confirm_view = ConfirmView(interaction.user)
+        await interaction.followup.send(embed=confirm_embed, view=confirm_view, ephemeral=True)
+        
+        await confirm_view.wait()
+        
+        if confirm_view.value is None or not confirm_view.value:
+            confirm_embed.description = "Bulk sell cancelled."
+            confirm_embed.color = discord.Color.red()
+            await interaction.edit_original_response(embed=confirm_embed, view=None)
+            return
+        
         _active_operations.add(interaction.user.id)
         try:
-            total_value = 0
             sold_count = 0
+            actual_value = 0
             
             async with in_transaction():
                 await player.refresh_from_db()
@@ -537,18 +565,18 @@ class Coins(commands.GroupCog, group_name="coins"):
                         value = inst.countryball.quicksell_value
                         if inst.specialcard:
                             value = int(value * 1.5)
-                        total_value += value
+                        actual_value += value
                         inst.deleted = True
                         await inst.save(update_fields=["deleted"])
                         sold_count += 1
                 
-                player.coins += total_value
+                player.coins += actual_value
                 await player.save(update_fields=["coins"])
             
             embed = discord.Embed(
                 title="Bulk Quicksell Complete!",
                 description=(
-                    f"You sold **{sold_count}** {settings.plural_collectible_name} for **{total_value:,}** coins!\n"
+                    f"You sold **{sold_count}** {settings.plural_collectible_name} for **{actual_value:,}** coins!\n"
                     f"New balance: **{player.coins:,}** coins"
                 ),
                 color=discord.Color.green()
