@@ -97,6 +97,7 @@ class BulkSellSelector(Pages):
         source = BulkSellSource(balls)
         super().__init__(source, interaction=interaction)
         self.add_item(self.select_ball_menu)
+        self.add_item(self.quit_button)
         self.add_item(self.confirm_button)
         self.add_item(self.select_all_button)
         self.add_item(self.clear_button)
@@ -139,7 +140,6 @@ class BulkSellSelector(Pages):
     async def select_ball_menu(
         self, interaction: discord.Interaction["BallsDexBot"], item: discord.ui.Select
     ):
-        await interaction.response.defer()
         for value in item.values:
             if value == "none":
                 continue
@@ -147,6 +147,34 @@ class BulkSellSelector(Pages):
                 "ball", "player", "special"
             )
             self.balls_selected.add(ball_instance)
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Quit", style=discord.ButtonStyle.danger)
+    async def quit_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        self.confirmed = False
+        self.balls_selected.clear()
+        self.stop()
+        await interaction.followup.send("Bulk sell cancelled.", ephemeral=True)
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
+    async def confirm_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not self.balls_selected:
+            await interaction.followup.send(
+                f"You haven't selected any {settings.plural_collectible_name}!", ephemeral=True
+            )
+            return
+        self.confirmed = True
+        self.stop()
+        await interaction.followup.send(
+            f"Selected {len(self.balls_selected)} {settings.plural_collectible_name}. Processing...",
+            ephemeral=True,
+        )
 
     @discord.ui.button(label="Select Page", style=discord.ButtonStyle.secondary)
     async def select_all_button(
@@ -167,26 +195,17 @@ class BulkSellSelector(Pages):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary)
-    async def confirm_button(
-        self, interaction: discord.Interaction["BallsDexBot"], button: Button
-    ):
-        if not self.balls_selected:
-            await interaction.response.send_message(
-                f"You haven't selected any {settings.plural_collectible_name}!", ephemeral=True
-            )
-            return
-        self.confirmed = True
-        self.stop()
-        await interaction.response.defer()
-
-    @discord.ui.button(label="Clear", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Clear", style=discord.ButtonStyle.secondary)
     async def clear_button(
         self, interaction: discord.Interaction["BallsDexBot"], button: Button
     ):
+        await interaction.response.defer(thinking=True, ephemeral=True)
         self.balls_selected.clear()
-        await interaction.response.send_message(
-            "Selection cleared.", ephemeral=True
+        await interaction.followup.send(
+            f"You have cleared all currently selected {settings.plural_collectible_name}.\n"
+            "There may be an instance where it shows selected items on the current page, "
+            "this is not the case - changing page will show the correct state.",
+            ephemeral=True,
         )
 
 
