@@ -61,8 +61,28 @@ class ConfirmView(discord.ui.View):
 class BulkSellSource(menus.ListPageSource):
     def __init__(self, entries: List[int]):
         super().__init__(entries, per_page=25)
+        self.cache: dict[int, BallInstance] = {}
 
-    async def format_page(self, menu, balls):
+    async def prepare(self):
+        first_entries = (
+            self.entries[: self.per_page * 5]
+            if len(self.entries) > self.per_page * 5
+            else self.entries
+        )
+        balls = await BallInstance.filter(id__in=first_entries).prefetch_related("ball", "special")
+        for ball in balls:
+            self.cache[ball.pk] = ball
+
+    async def fetch_page(self, ball_ids: List[int]) -> AsyncIterator[BallInstance]:
+        if ball_ids and ball_ids[0] not in self.cache:
+            async for ball in BallInstance.filter(id__in=ball_ids).prefetch_related("ball", "special"):
+                self.cache[ball.pk] = ball
+        for id in ball_ids:
+            if id in self.cache:
+                yield self.cache[id]
+
+    async def format_page(self, menu: "BulkSellSelector", ball_ids: List[int]):
+        await menu.set_options(self.fetch_page(ball_ids))
         return True
 
 
