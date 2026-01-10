@@ -529,57 +529,109 @@ class Coins(commands.GroupCog, group_name="coins"):
         if not view.confirmed or not view.balls_selected:
             return
         
+        if interaction.user.id in _active_operations:
+            await interaction.edit_original_response(
+                content="You have another operation in progress!", embed=None, view=None
+            )
+            return
+        
         _active_operations.add(interaction.user.id)
+        locked_balls = []
         try:
+            valid_balls = await BallInstance.filter(
+                id__in=list(view.balls_selected),
+                player=player,
+                deleted=False,
+                favorite=False,
+                locked__isnull=True
+            ).prefetch_related("ball", "special")
+            
+            for inst in valid_balls:
+                await inst.lock_for_trade()
+                locked_balls.append(inst)
+            
+            if not locked_balls:
+                await interaction.edit_original_response(
+                    content=None,
+                    embed=discord.Embed(
+                        title="Bulk Sell Failed",
+                        description="None of the selected NBAs could be sold. They may have been traded or locked.",
+                        color=discord.Color.red()
+                    ),
+                    view=None
+                )
+                return
+            
+            total_value = 0
+            for inst in locked_balls:
+                value = inst.countryball.quicksell_value
+                if inst.specialcard:
+                    value = int(value * 1.5)
+                total_value += value
+            
+            confirm_embed = discord.Embed(
+                title="Confirm Bulk Sell",
+                description=(
+                    f"Are you sure you want to sell **{len(locked_balls)}** "
+                    f"{settings.plural_collectible_name} for **{total_value:,}** coins?\n\n"
+                    f"This action cannot be undone!"
+                ),
+                color=discord.Color.orange()
+            )
+            
+            confirm_view = ConfirmView(interaction.user)
+            await interaction.edit_original_response(content=None, embed=confirm_embed, view=confirm_view)
+            
+            await confirm_view.wait()
+            
+            if confirm_view.value is None or not confirm_view.value:
+                for inst in locked_balls:
+                    await inst.unlock()
+                confirm_embed.title = "Bulk Sell Cancelled"
+                confirm_embed.description = "You cancelled the bulk sell."
+                confirm_embed.color = discord.Color.red()
+                await interaction.edit_original_response(embed=confirm_embed, view=None)
+                return
+            
             sold_count = 0
             actual_value = 0
-            skipped = 0
             
             async with in_transaction():
                 await player.refresh_from_db()
                 
-                valid_balls = await BallInstance.filter(
-                    id__in=list(view.balls_selected),
-                    player=player,
-                    deleted=False,
-                    favorite=False,
-                    locked__isnull=True
-                ).prefetch_related("ball", "special")
-                
-                for inst in valid_balls:
-                    await inst.lock_for_trade()
-                
-                for inst in valid_balls:
-                    value = inst.countryball.quicksell_value
-                    if inst.specialcard:
-                        value = int(value * 1.5)
-                    actual_value += value
-                    inst.deleted = True
-                    await inst.save(update_fields=["deleted"])
+                for inst in locked_balls:
+                    await inst.refresh_from_db()
+                    if inst.player_id == player.pk and not inst.deleted:
+                        value = inst.countryball.quicksell_value
+                        if inst.specialcard:
+                            value = int(value * 1.5)
+                        actual_value += value
+                        inst.deleted = True
+                        await inst.save(update_fields=["deleted"])
+                        sold_count += 1
                     await inst.unlock()
-                    sold_count += 1
                 
-                skipped = len(view.balls_selected) - sold_count
                 player.coins += actual_value
                 await player.save(update_fields=["coins"])
             
-            if sold_count == 0:
-                embed = discord.Embed(
-                    title="Bulk Sell Failed",
-                    description="None of the selected NBAs could be sold. They may have been traded or locked.",
-                    color=discord.Color.red()
-                )
-            else:
-                skip_text = f"\n({skipped} skipped - traded/locked)" if skipped > 0 else ""
-                embed = discord.Embed(
-                    title="Bulk Quicksell Complete!",
-                    description=(
-                        f"You sold **{sold_count}** {settings.plural_collectible_name} for **{actual_value:,}** coins!{skip_text}\n"
-                        f"New balance: **{player.coins:,}** coins"
-                    ),
-                    color=discord.Color.green()
-                )
-            await interaction.edit_original_response(content=None, embed=embed, view=None)
+            skipped = len(locked_balls) - sold_count
+            skip_text = f"\n({skipped} skipped)" if skipped > 0 else ""
+            embed = discord.Embed(
+                title="Bulk Quicksell Complete!",
+                description=(
+                    f"You sold **{sold_count}** {settings.plural_collectible_name} for **{actual_value:,}** coins!{skip_text}\n"
+                    f"New balance: **{player.coins:,}** coins"
+                ),
+                color=discord.Color.green()
+            )
+            await interaction.edit_original_response(embed=embed, view=None)
+        except Exception:
+            for inst in locked_balls:
+                try:
+                    await inst.unlock()
+                except Exception:
+                    pass
+            raise
         finally:
             _active_operations.discard(interaction.user.id)
 
