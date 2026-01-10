@@ -1,11 +1,11 @@
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Optional, List, Set
+from typing import TYPE_CHECKING, Optional, List, Set, AsyncIterator
 
 import discord
 from discord import app_commands
 from discord.ext import commands
+from discord.ui import Button
 from tortoise import timezone
 from tortoise.expressions import Q
 from tortoise.transactions import in_transaction
@@ -18,8 +18,6 @@ from ballsdex.core.models import (
     Player,
     PlayerPack,
     Special,
-    balls as balls_cache,
-    specials as specials_cache,
 )
 from ballsdex.core.utils import menus
 from ballsdex.core.utils.paginator import Pages
@@ -60,134 +58,108 @@ class ConfirmView(discord.ui.View):
 
 
 class BulkSellSource(menus.ListPageSource):
-    def __init__(self, entries: List[BallInstance], bot: "BallsDexBot"):
+    def __init__(self, entries: List[int]):
         super().__init__(entries, per_page=25)
-        self.bot = bot
 
-    async def format_page(self, menu, instances: List[BallInstance]):
+    async def format_page(self, menu, balls):
         return True
 
 
-class BulkSellSelect(discord.ui.Select):
-    def __init__(self, instances: List[BallInstance], selected: Set[int], bot: "BallsDexBot"):
-        self.instances = instances
-        self.selected = selected
-        self.bot = bot
-        options = self._build_options()
-        super().__init__(
-            placeholder="Select NBAs to sell...",
-            min_values=0,
-            max_values=min(25, len(options)),
-            options=options,
-        )
-
-    def _build_options(self) -> List[discord.SelectOption]:
-        options = []
-        for inst in self.instances[:25]:
-            ball = inst.countryball
-            value = ball.quicksell_value
-            if inst.specialcard:
-                value = int(value * 1.5)
-            attack = "{:+}".format(inst.attack_bonus)
-            health = "{:+}".format(inst.health_bonus)
-            special_text = f" ({inst.specialcard.name})" if inst.specialcard else ""
-            emoji = self.bot.get_emoji(ball.emoji_id)
-            options.append(discord.SelectOption(
-                label=f"#{inst.pk:0X} {ball.country}{special_text}",
-                description=f"{attack}%/{health}% - {value:,} coins",
-                value=str(inst.pk),
-                default=inst.pk in self.selected,
-                emoji=emoji,
-            ))
-        return options
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        current_page_pks = {inst.pk for inst in self.instances[:25]}
-        self.selected -= current_page_pks
-        for val in self.values:
-            self.selected.add(int(val))
-        self.view.update_footer()
-
-
-class BulkSellView(Pages):
+class BulkSellSelector(Pages):
     def __init__(
         self,
-        interaction: discord.Interaction,
-        instances: List[BallInstance],
-        bot: "BallsDexBot",
+        interaction: discord.Interaction["BallsDexBot"],
+        balls: List[int],
     ):
-        self.all_instances = instances
-        self.bot = bot
-        self.selected: Set[int] = set()
-        self.confirmed = False
-        source = BulkSellSource(instances, bot)
+        self.bot = interaction.client
+        self.interaction = interaction
+        source = BulkSellSource(balls)
         super().__init__(source, interaction=interaction)
-        self.select_menu: Optional[BulkSellSelect] = None
-        self.update_select_menu()
+        self.add_item(self.select_ball_menu)
         self.add_item(self.confirm_button)
         self.add_item(self.select_all_button)
-        self.add_item(self.cancel_button)
+        self.add_item(self.clear_button)
+        self.balls_selected: Set[BallInstance] = set()
+        self.confirmed = False
 
-    def update_select_menu(self):
-        if self.select_menu:
-            self.remove_item(self.select_menu)
-        start = self.current_page * 25
-        end = start + 25
-        page_instances = self.all_instances[start:end]
-        if page_instances:
-            self.select_menu = BulkSellSelect(page_instances, self.selected, self.bot)
-            self.add_item(self.select_menu)
+    async def set_options(self, balls: AsyncIterator[BallInstance]):
+        options: List[discord.SelectOption] = []
+        async for ball in balls:
+            if ball.favorite or ball.deleted:
+                continue
+            emoji = self.bot.get_emoji(int(ball.countryball.emoji_id))
+            special = ball.special_emoji(self.bot, True)
+            value = ball.countryball.quicksell_value
+            if ball.specialcard:
+                value = int(value * 1.5)
+            options.append(
+                discord.SelectOption(
+                    label=f"{special}#{ball.pk:0X} {ball.countryball.country}",
+                    description=f"ATK: {ball.attack_bonus:+d}% • HP: {ball.health_bonus:+d}% • {value:,} coins",
+                    emoji=emoji,
+                    value=f"{ball.pk}",
+                    default=ball in self.balls_selected,
+                )
+            )
+        self.select_ball_menu.options = options if options else [
+            discord.SelectOption(label="No NBAs available", value="none")
+        ]
+        self.select_ball_menu.max_values = max(1, len(options))
+        self.select_ball_menu.min_values = 0 if options else 1
 
-    def update_footer(self):
-        pass
+    @discord.ui.select(min_values=0, max_values=25)
+    async def select_ball_menu(
+        self, interaction: discord.Interaction["BallsDexBot"], item: discord.ui.Select
+    ):
+        for value in item.values:
+            if value == "none":
+                continue
+            ball_instance = await BallInstance.get(id=int(value)).prefetch_related(
+                "ball", "player", "special"
+            )
+            self.balls_selected.add(ball_instance)
+        await interaction.response.defer()
 
-    async def show_page(self, interaction: discord.Interaction, page_number: int):
-        self.current_page = page_number
-        self.update_select_menu()
-        await self._update_view(interaction)
-
-    async def _update_view(self, interaction: discord.Interaction):
-        total_value = 0
-        for inst in self.all_instances:
-            if inst.pk in self.selected:
-                value = inst.countryball.quicksell_value
-                if inst.specialcard:
-                    value = int(value * 1.5)
-                total_value += value
-        
-        embed = discord.Embed(
-            title="Bulk Sell NBAs",
-            description=(
-                f"Select NBAs to sell. Page {self.current_page + 1}/{self.source.get_max_pages()}\n\n"
-                f"**Selected: {len(self.selected)}** NBAs for **{total_value:,}** coins\n"
-                f"Use the dropdown to select, then click Confirm."
-            ),
-            color=discord.Color.gold()
+    @discord.ui.button(label="Select Page", style=discord.ButtonStyle.secondary)
+    async def select_all_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        for ball in self.select_ball_menu.options:
+            if ball.value == "none":
+                continue
+            ball_instance = await BallInstance.get(id=int(ball.value)).prefetch_related(
+                "ball", "player", "special"
+            )
+            if ball_instance not in self.balls_selected:
+                self.balls_selected.add(ball_instance)
+        await interaction.followup.send(
+            f"All {settings.plural_collectible_name} on this page have been selected.\n"
+            "Note that the menu may not reflect this change until you change page.",
+            ephemeral=True,
         )
-        await interaction.edit_original_response(embed=embed, view=self)
 
-    @discord.ui.button(label="Confirm Sale", style=discord.ButtonStyle.success, row=2)
-    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected:
-            await interaction.response.send_message("No NBAs selected!", ephemeral=True)
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary)
+    async def confirm_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        if not self.balls_selected:
+            await interaction.response.send_message(
+                f"You haven't selected any {settings.plural_collectible_name}!", ephemeral=True
+            )
             return
         self.confirmed = True
         self.stop()
         await interaction.response.defer()
 
-    @discord.ui.button(label="Select All", style=discord.ButtonStyle.secondary, row=2)
-    async def select_all_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        for inst in self.all_instances:
-            self.selected.add(inst.pk)
-        self.update_select_menu()
-        await self._update_view(interaction)
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, row=2)
-    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.confirmed = False
-        self.stop()
-        await interaction.response.defer()
+    @discord.ui.button(label="Clear", style=discord.ButtonStyle.danger)
+    async def clear_button(
+        self, interaction: discord.Interaction["BallsDexBot"], button: Button
+    ):
+        self.balls_selected.clear()
+        await interaction.response.send_message(
+            "Selection cleared.", ephemeral=True
+        )
 
 
 class PackTransform(app_commands.Transformer):
@@ -272,10 +244,43 @@ class Coins(commands.GroupCog, group_name="coins"):
         
         embed = discord.Embed(
             title="Coins Balance",
-            description=f"You have **{player.coins:,}** coins",
+            description=f"{interaction.user.mention} has **{player.coins:,}** coins",
             color=discord.Color.gold()
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command()
+    async def leaderboard(self, interaction: discord.Interaction):
+        """
+        View the top 10 users with the most coins.
+        """
+        await interaction.response.defer()
+        
+        top_players = await Player.filter(coins__gt=0).order_by("-coins").limit(10)
+        
+        if not top_players:
+            await interaction.followup.send("No players with coins found!")
+            return
+        
+        description = ""
+        medals = ["🥇", "🥈", "🥉"]
+        
+        for i, player in enumerate(top_players):
+            try:
+                user = await self.bot.fetch_user(player.discord_id)
+                username = user.display_name
+            except Exception:
+                username = f"User {player.discord_id}"
+            
+            medal = medals[i] if i < 3 else f"**{i+1}.**"
+            description += f"{medal} {username} — **{player.coins:,}** coins\n"
+        
+        embed = discord.Embed(
+            title="🏆 Coins Leaderboard",
+            description=description,
+            color=discord.Color.gold()
+        )
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command()
     async def give(
@@ -332,9 +337,8 @@ class Coins(commands.GroupCog, group_name="coins"):
                 await recipient.save(update_fields=["coins"])
             
             await interaction.response.send_message(
-                f"You gave **{amount:,}** coins to {user.mention}!\n"
-                f"Your new balance: **{player.coins:,}** coins",
-                ephemeral=True
+                f"{interaction.user.mention} gave **{amount:,}** coins to {user.mention}!\n"
+                f"New balance: **{player.coins:,}** coins"
             )
         finally:
             _active_operations.discard(interaction.user.id)
@@ -483,46 +487,31 @@ class Coins(commands.GroupCog, group_name="coins"):
             )
             return
         
-        view = BulkSellView(interaction, list(instances), self.bot)
+        ball_ids = [inst.pk for inst in instances]
+        view = BulkSellSelector(interaction, ball_ids)
         
-        total_value = sum(
-            int(inst.countryball.quicksell_value * (1.5 if inst.specialcard else 1))
-            for inst in instances
+        content = (
+            f"Select the {settings.plural_collectible_name} you want to add to your sell proposal, "
+            "note that the display will wipe on pagination however the selected "
+            f"{settings.plural_collectible_name} will remain."
         )
         
-        embed = discord.Embed(
-            title="Bulk Sell NBAs",
-            description=(
-                f"Select NBAs to sell. Page 1/{view.source.get_max_pages()}\n\n"
-                f"**Selected: 0** NBAs for **0** coins\n"
-                f"Use the dropdown to select, then click Confirm.\n\n"
-                f"*Total available: {len(instances)} NBAs worth {total_value:,} coins*"
-            ),
-            color=discord.Color.gold()
-        )
-        
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-        
+        await view.start(content=content, ephemeral=True)
         await view.wait()
         
-        if not view.confirmed or not view.selected:
-            embed.description = "Bulk sell cancelled."
-            embed.color = discord.Color.red()
-            await interaction.edit_original_response(embed=embed, view=None)
+        if not view.confirmed or not view.balls_selected:
+            await interaction.followup.send("Bulk sell cancelled.", ephemeral=True)
             return
         
         _active_operations.add(interaction.user.id)
         try:
-            selected_pks = view.selected
             total_value = 0
             sold_count = 0
             
             async with in_transaction():
                 await player.refresh_from_db()
                 
-                for inst in instances:
-                    if inst.pk not in selected_pks:
-                        continue
+                for inst in view.balls_selected:
                     await inst.refresh_from_db()
                     if inst.player_id == player.pk and not inst.deleted and not inst.favorite:
                         value = inst.countryball.quicksell_value
@@ -536,13 +525,15 @@ class Coins(commands.GroupCog, group_name="coins"):
                 player.coins += total_value
                 await player.save(update_fields=["coins"])
             
-            embed.title = "Bulk Quicksell Complete!"
-            embed.description = (
-                f"You sold **{sold_count}** {settings.plural_collectible_name} for **{total_value:,}** coins!\n"
-                f"New balance: **{player.coins:,}** coins"
+            embed = discord.Embed(
+                title="Bulk Quicksell Complete!",
+                description=(
+                    f"You sold **{sold_count}** {settings.plural_collectible_name} for **{total_value:,}** coins!\n"
+                    f"New balance: **{player.coins:,}** coins"
+                ),
+                color=discord.Color.green()
             )
-            embed.color = discord.Color.green()
-            await interaction.edit_original_response(embed=embed, view=None)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         finally:
             _active_operations.discard(interaction.user.id)
 
@@ -792,9 +783,8 @@ class Packs(commands.GroupCog, group_name="pack"):
             
             emoji = the_pack.emoji + " " if the_pack.emoji else ""
             await interaction.response.send_message(
-                f"You gave **{amount}x {emoji}{the_pack.name}** to {user.mention}!\n"
-                f"You now have **{pack.quantity}** of this pack.",
-                ephemeral=True
+                f"{interaction.user.mention} gave **{amount}x {emoji}{the_pack.name}** to {user.mention}!\n"
+                f"You now have **{pack.quantity}** of this pack."
             )
         finally:
             _active_operations.discard(interaction.user.id)
@@ -834,6 +824,8 @@ class Packs(commands.GroupCog, group_name="pack"):
             )
             return
         
+        await interaction.response.defer()
+        
         _active_operations.add(interaction.user.id)
         try:
             await pack.fetch_related("pack", "player")
@@ -844,9 +836,8 @@ class Packs(commands.GroupCog, group_name="pack"):
                 await pack.refresh_from_db()
                 
                 if pack.quantity < amount:
-                    await interaction.response.send_message(
-                        f"You only have **{pack.quantity}** of this pack!",
-                        ephemeral=True
+                    await interaction.followup.send(
+                        f"You only have **{pack.quantity}** of this pack!"
                     )
                     return
                 
@@ -861,17 +852,15 @@ class Packs(commands.GroupCog, group_name="pack"):
                     remaining = the_pack.daily_limit - opens_today
                     if remaining <= 0:
                         hours_until_reset = 24 - timezone.now().hour
-                        await interaction.response.send_message(
+                        await interaction.followup.send(
                             f"You've reached the daily limit for opening **{the_pack.name}**!\n"
-                            f"Your limit will reset in about {hours_until_reset} hours.",
-                            ephemeral=True
+                            f"Your limit will reset in about {hours_until_reset} hours."
                         )
                         return
                     
                     if amount > remaining:
-                        await interaction.response.send_message(
-                            f"You can only open **{remaining}** more of this pack today!",
-                            ephemeral=True
+                        await interaction.followup.send(
+                            f"You can only open **{remaining}** more of this pack today!"
                         )
                         return
                 
@@ -889,9 +878,8 @@ class Packs(commands.GroupCog, group_name="pack"):
                 if not available_balls:
                     pack.quantity += amount
                     await pack.save(update_fields=["quantity"])
-                    await interaction.response.send_message(
-                        f"No {settings.plural_collectible_name} available in this pack's rarity range!",
-                        ephemeral=True
+                    await interaction.followup.send(
+                        f"No {settings.plural_collectible_name} available in this pack's rarity range!"
                     )
                     return
                 
@@ -973,6 +961,6 @@ class Packs(commands.GroupCog, group_name="pack"):
                     color=discord.Color.gold()
                 )
             
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
         finally:
             _active_operations.discard(interaction.user.id)

@@ -25,12 +25,26 @@ This is NBAdex, a Discord bot for collecting and trading NBA-themed collectibles
   - Users see "You have another operation in progress!" if they try to exploit
 
 - **BULK SELL COMMAND IMPROVED** (`/coins bulk_sell`):
-  - Now has interactive selection UI like `/trade bulk add`
-  - Paginated dropdown selector to choose which NBAs to sell
-  - "Select All" button for convenience
-  - Shows live total of selected NBAs and coin value
-  - Confirm/Cancel buttons for final action
+  - Now works exactly like `/trade bulk add` with full paginated selection UI
+  - BulkSellSelector class mirrors CountryballsSelector from trade
+  - Dropdown shows NBA name, stats, and coin value per card
+  - "Select Page" button to select all on current page
+  - "Confirm" and "Clear" buttons for final actions
   - Filters: by NBA type, special event, with sorting options
+
+- **PACK OPEN FIX**: Fixed "application did not respond" error
+  - Now properly defers response immediately before any processing
+  - Uses followup.send for all responses after defer
+
+- **COMMANDS NOW PUBLIC (Not Ephemeral)**:
+  - `/coins balance` - Now public, shows user mention
+  - `/coins give` - Now public, shows who gave coins to whom
+  - `/pack give` - Now public, shows who gave packs to whom
+
+- **NEW COMMAND: `/coins leaderboard`**
+  - Shows top 10 users with the most coins
+  - Gold/silver/bronze medals for top 3
+  - Displays username and coin count
 
 - **ALL COMMANDS FASTER AND BUG-FREE**:
   - ConfirmView buttons now defer responses to prevent interaction failures
