@@ -24,6 +24,10 @@ author = "agent"
 task = "workflow.run"
 args = "Discord Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Admin Panel"
+
 [[workflows.workflow]]
 name = "Discord Bot"
 author = "agent"
@@ -34,6 +38,18 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"
+
+[[workflows.workflow]]
+name = "Admin Panel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
 localPort = 5000
