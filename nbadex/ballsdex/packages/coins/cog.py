@@ -287,24 +287,27 @@ class Coins(commands.GroupCog, group_name="coins"):
             await interaction.followup.send("No players with coins found!")
             return
         
-        description = ""
         medals = ["🥇", "🥈", "🥉"]
+        lines = []
         
         for i, player in enumerate(top_players):
             try:
                 user = await self.bot.fetch_user(player.discord_id)
                 username = user.display_name
             except Exception:
-                username = f"User {player.discord_id}"
+                username = f"Unknown User"
             
-            medal = medals[i] if i < 3 else f"**{i+1}.**"
-            description += f"{medal} {username} — **{player.coins:,}** coins\n"
+            if i < 3:
+                lines.append(f"{medals[i]} **{username}** — `{player.coins:,}` coins")
+            else:
+                lines.append(f"`#{i+1}` {username} — `{player.coins:,}` coins")
         
         embed = discord.Embed(
-            title="🏆 Coins Leaderboard",
-            description=description,
+            title="💰 Richest Players",
+            description="\n".join(lines),
             color=discord.Color.gold()
         )
+        embed.set_footer(text="💵 Use /coins sell or /pack open to earn coins!")
         await interaction.followup.send(embed=embed)
 
     @app_commands.command()
@@ -400,52 +403,57 @@ class Coins(commands.GroupCog, group_name="coins"):
             await interaction.response.send_message("You have another operation in progress!", ephemeral=True)
             return
 
-        ball = countryball.countryball
-        sell_value = ball.quicksell_value
-        
-        bonus_multiplier = 1.0
-        if countryball.specialcard:
-            bonus_multiplier = 1.5
-        
-        final_value = int(sell_value * bonus_multiplier)
-        
-        attack = "{:+}".format(countryball.attack_bonus)
-        health = "{:+}".format(countryball.health_bonus)
-        special_text = f" ({countryball.specialcard.name})" if countryball.specialcard else ""
-        
-        embed = discord.Embed(
-            title="Confirm Quicksell",
-            description=(
-                f"Are you sure you want to sell **#{countryball.pk:0X} {ball.country}{special_text}** "
-                f"({attack}%/{health}%) for **{final_value:,}** coins?"
-            ),
-            color=discord.Color.orange()
-        )
-        
-        view = ConfirmView(interaction.user)
-        await interaction.response.send_message(embed=embed, view=view)
-        
-        await view.wait()
-        
-        if view.value is None:
-            embed.description = "Quicksell timed out."
-            embed.color = discord.Color.greyple()
-            await interaction.edit_original_response(embed=embed, view=None)
-            return
-        
-        if not view.value:
-            embed.description = "Quicksell cancelled."
-            embed.color = discord.Color.red()
-            await interaction.edit_original_response(embed=embed, view=None)
-            return
-        
         _active_operations.add(interaction.user.id)
         try:
+            await countryball.lock_for_trade()
+            
+            ball = countryball.countryball
+            sell_value = ball.quicksell_value
+            
+            bonus_multiplier = 1.0
+            if countryball.specialcard:
+                bonus_multiplier = 1.5
+            
+            final_value = int(sell_value * bonus_multiplier)
+            
+            attack = "{:+}".format(countryball.attack_bonus)
+            health = "{:+}".format(countryball.health_bonus)
+            special_text = f" ({countryball.specialcard.name})" if countryball.specialcard else ""
+            
+            embed = discord.Embed(
+                title="Confirm Quicksell",
+                description=(
+                    f"Are you sure you want to sell **#{countryball.pk:0X} {ball.country}{special_text}** "
+                    f"({attack}%/{health}%) for **{final_value:,}** coins?"
+                ),
+                color=discord.Color.orange()
+            )
+            
+            view = ConfirmView(interaction.user)
+            await interaction.response.send_message(embed=embed, view=view)
+            
+            await view.wait()
+            
+            if view.value is None:
+                await countryball.unlock()
+                embed.description = "Quicksell timed out."
+                embed.color = discord.Color.greyple()
+                await interaction.edit_original_response(embed=embed, view=None)
+                return
+            
+            if not view.value:
+                await countryball.unlock()
+                embed.description = "Quicksell cancelled."
+                embed.color = discord.Color.red()
+                await interaction.edit_original_response(embed=embed, view=None)
+                return
+            
             async with in_transaction():
                 player = await Player.get(discord_id=interaction.user.id)
                 await countryball.refresh_from_db()
                 
                 if countryball.player_id != player.pk or countryball.deleted:
+                    await countryball.unlock()
                     embed.description = f"You no longer own this {settings.collectible_name}!"
                     embed.color = discord.Color.red()
                     await interaction.edit_original_response(embed=embed, view=None)
@@ -453,6 +461,7 @@ class Coins(commands.GroupCog, group_name="coins"):
                 
                 countryball.deleted = True
                 await countryball.save(update_fields=["deleted"])
+                await countryball.unlock()
                 
                 player.coins += final_value
                 await player.save(update_fields=["coins"])
@@ -464,6 +473,12 @@ class Coins(commands.GroupCog, group_name="coins"):
             )
             embed.color = discord.Color.green()
             await interaction.edit_original_response(embed=embed, view=None)
+        except Exception:
+            try:
+                await countryball.unlock()
+            except Exception:
+                pass
+            raise
         finally:
             _active_operations.discard(interaction.user.id)
 
