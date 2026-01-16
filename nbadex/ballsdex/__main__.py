@@ -26,8 +26,15 @@ from ballsdex.settings import read_settings, settings, update_settings, write_de
 discord.voice_client.VoiceClient.warn_nacl = False  # disable PyNACL warning
 log = logging.getLogger("ballsdex")
 
+def get_database_url():
+    """Get database URL with proper scheme conversion for Tortoise ORM."""
+    url = os.environ.get("DATABASE_URL") or os.environ.get("BALLSDEXBOT_DB_URL")
+    if url and url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgres://", 1)
+    return url
+
 TORTOISE_ORM = {
-    "connections": {"default": os.environ.get("DATABASE_URL", os.environ.get("BALLSDEXBOT_DB_URL"))},
+    "connections": {"default": get_database_url()},
     "apps": {
         "models": {
             "models": ["ballsdex.core.models"],
