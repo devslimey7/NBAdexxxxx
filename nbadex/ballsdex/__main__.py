@@ -27,7 +27,7 @@ discord.voice_client.VoiceClient.warn_nacl = False  # disable PyNACL warning
 log = logging.getLogger("ballsdex")
 
 TORTOISE_ORM = {
-    "connections": {"default": os.environ.get("BALLSDEXBOT_DB_URL")},
+    "connections": {"default": os.environ.get("DATABASE_URL", os.environ.get("BALLSDEXBOT_DB_URL"))},
     "apps": {
         "models": {
             "models": ["ballsdex.core.models"],
@@ -241,8 +241,10 @@ class RemoveWSBehindMsg(logging.Filter):
 
 async def init_tortoise(db_url: str, *, skip_migrations: bool = False):
     log.debug(f"Database URL: {db_url}")
+    # Convert postgresql:// to postgres:// for Tortoise ORM compatibility
+    db_url_fixed = db_url.replace("postgresql://", "postgres://") if db_url.startswith("postgresql://") else db_url
     # Convert psycopg format (sslmode=require) to asyncpg format (ssl=true)
-    db_url_asyncpg = db_url.replace("?sslmode=require", "?ssl=true") if "?sslmode=require" in db_url else db_url
+    db_url_asyncpg = db_url_fixed.replace("?sslmode=require", "?ssl=true").replace("?sslmode=disable", "") if "?sslmode" in db_url_fixed else db_url_fixed
     TORTOISE_ORM["connections"]["default"] = db_url_asyncpg
     TORTOISE_ORM["apps"]["models"]["models"].extend(settings.tortoise_models)
     await Tortoise.init(config=TORTOISE_ORM)
@@ -309,10 +311,10 @@ def main():
             time.sleep(1)
             sys.exit(0)
 
-        db_url = os.environ.get("BALLSDEXBOT_DB_URL", None)
+        db_url = os.environ.get("DATABASE_URL") or os.environ.get("BALLSDEXBOT_DB_URL")
         if not db_url:
             log.error("Database URL not found!")
-            print("[red]You must provide a DB URL with the BALLSDEXBOT_DB_URL env var.[/red]")
+            print("[red]You must provide a DB URL with the DATABASE_URL or BALLSDEXBOT_DB_URL env var.[/red]")
             time.sleep(1)
             sys.exit(0)
 
