@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "libyaml", "openjpeg", "postgresql", "tcl", "tk", "zlib"]
+packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "libyaml", "openjpeg", "postgresql", "tcl", "tk", "zlib", "postgresql_16"]
 
 [userenv]
 
@@ -27,6 +27,10 @@ args = "Discord Bot"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Admin Panel"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "PostgreSQL"
 
 [[workflows.workflow]]
 name = "Discord Bot"
@@ -51,9 +55,25 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
+[[workflows.workflow]]
+name = "PostgreSQL"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "postgres -D /home/runner/postgres_data -k /home/runner/postgres_socket"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5432
+externalPort = 3000
+exposeLocalhost = true
 
 [deployment]
 deploymentTarget = "vm"
