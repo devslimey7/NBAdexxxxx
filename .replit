@@ -4,13 +4,13 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "libyaml", "openjpeg", "postgresql", "tcl", "tk", "zlib", "postgresql_16"]
+packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "libyaml", "openjpeg", "postgresql", "tcl", "tk", "zlib", "postgresql_17"]
 
 [userenv]
 
 [userenv.shared]
 DJANGO_SETTINGS_MODULE = "admin_panel.settings.production"
-BALLSDEXBOT_DB_URL = "postgres://neondb_owner:npg_EIW4OBLTRl2p@ep-dark-credit-ago4wkqu-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+BALLSDEXBOT_DB_URL = "postgres://nbadex_user:NBAdex2026SecurePass!@/nbadex?host=/home/runner/postgres_socket"
 
 [workflows]
 runButton = "Project"
@@ -77,4 +77,4 @@ exposeLocalhost = true
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && gunicorn --bind 0.0.0.0:5000 --workers 4 --chdir admin_panel admin_panel.wsgi:application & cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"]
+run = ["bash", "-c", "mkdir -p /home/runner/postgres_socket /home/runner/backups && postgres -D /home/runner/postgres_data -k /home/runner/postgres_socket & sleep 5 && cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && gunicorn --bind 0.0.0.0:5000 --workers 4 --chdir admin_panel admin_panel.wsgi:application & cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"]
