@@ -61,4 +61,4 @@ exposeLocalhost = true
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application & cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"]
+run = ["bash", "-c", "export BALLSDEXBOT_DB_URL=\"postgresql://neondb_owner:npg_qgt5uye1dKLT@ep-dry-base-a6hd53ba.us-west-2.aws.neon.tech/neondb?sslmode=require\" && export DJANGO_SETTINGS_MODULE=\"admin_panel.settings.production\" && cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application & sleep 2 && cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"]
