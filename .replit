@@ -10,7 +10,6 @@ packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp
 
 [userenv.shared]
 DJANGO_SETTINGS_MODULE = "admin_panel.settings.production"
-BALLSDEXBOT_DB_URL = "postgres://postgres:password@helium/heliumdb"
 
 [workflows]
 runButton = "Project"
