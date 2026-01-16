@@ -61,4 +61,4 @@ exposeLocalhost = true
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && gunicorn --bind 0.0.0.0:5000 --workers 4 --chdir admin_panel admin_panel.wsgi:application & cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content && wait"]
+run = ["bash", "-c", "cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && cd admin_panel && gunicorn --bind 0.0.0.0:5000 --workers 4 admin_panel.wsgi:application & cd /home/runner/workspace/nbadex && export PYTHONPATH=\"${PYTHONPATH}:$(pwd)\" && python -m ballsdex --disable-message-content"]
