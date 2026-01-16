@@ -10,7 +10,7 @@ packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp
 
 [userenv.shared]
 DJANGO_SETTINGS_MODULE = "admin_panel.settings.production"
-BALLSDEXBOT_DB_URL = "postgres://nbadex_user:NBAdex2026SecurePass!@/nbadex?host=/home/runner/postgres_socket"
+BALLSDEXBOT_DB_URL = "postgres://runner:@localhost:5432/nbadex"
 
 [workflows]
 runButton = "Project"
