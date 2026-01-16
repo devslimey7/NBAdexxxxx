@@ -16,11 +16,9 @@ Database Management: Clean up unused fields and systems entirely rather than usi
 
 - **Bot Framework**: discord.py with app_commands (slash commands)
 - **Admin Panel**: Django 5.x with custom admin interface
-- **Database**: Local PostgreSQL 17 (migrated from Neon on Jan 16, 2026) accessed via Tortoise ORM (bot) and Django ORM (admin panel)
-  - Data directory: `/home/runner/postgres_data`
-  - Socket directory: `/home/runner/postgres_socket`  
-  - Connection URL: `postgres://runner:@localhost:5432/nbadex`
-  - Daily backup script: `scripts/daily_backup.sh` (keeps 7 days in `/home/runner/backups`)
+- **Database**: Replit-managed PostgreSQL (cloud-hosted) accessed via Tortoise ORM (bot) and Django ORM (admin panel)
+  - Connection via DATABASE_URL environment variable
+  - Both bot and admin panel use BALLSDEXBOT_DB_URL (set to match DATABASE_URL)
 - **Image Generation**: Pillow (PIL) for generating collectible card images
 - **Deployment**: Optimized for Docker/Replit environments
 
